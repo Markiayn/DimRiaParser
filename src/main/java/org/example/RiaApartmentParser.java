@@ -1,4 +1,3 @@
-// File: RiaApartmentParser.java
 package org.example;
 
 import org.jsoup.Jsoup;
@@ -19,6 +18,8 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.regex.*;
 
+import static org.example.SQLiteJDBC.*;
+
 public class RiaApartmentParser {
 
     public static void main(String[] args) throws Exception {
@@ -26,11 +27,13 @@ public class RiaApartmentParser {
         int hoursLimit = 24;
         int maxPages = 2;
 
+        createTable();
         System.setProperty("webdriver.chrome.driver", chromedriverPath);
 
         ChromeDriver driver = setupDriver();
         DevTools devTools = setupDevTools(driver);
         String[] hashHolder = setupHashListener(devTools);
+        String[] phoneHolder = new String[1];
 
         ParserStats stats = new ParserStats();
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
@@ -43,7 +46,7 @@ public class RiaApartmentParser {
 
             for (int i = 0; i < items.length(); i++) {
                 int id = items.getInt(i);
-                if (processApartment(id, driver, formatter, hashHolder, hoursLimit, stats)) {
+                if (processApartment(id, driver, formatter, hashHolder, phoneHolder, hoursLimit, stats)) {
                     stats.shown++;
                 }
             }
@@ -92,7 +95,7 @@ public class RiaApartmentParser {
                 "&firstIteraction=false&limit=20&type=list&client=searchV2&ch=246_244" +
                 "&page=" + page;
 
-        System.out.println("\n\uD83D\uDCC4 Сторінка " + page + ":");
+        System.out.println("\n📄 Сторінка " + page + ":");
 
         Connection.Response response = Jsoup.connect(url)
                 .ignoreContentType(true)
@@ -104,7 +107,7 @@ public class RiaApartmentParser {
     }
 
     private static boolean processApartment(int id, ChromeDriver driver, DateTimeFormatter formatter, String[] hashHolder,
-                                            int hoursLimit, ParserStats stats) {
+                                            String[] phoneHolder, int hoursLimit, ParserStats stats) {
         try {
             JSONObject data = new JSONObject(Jsoup.connect("https://dom.ria.com/realty/data/" + id + "?lang_id=4&key=")
                     .ignoreContentType(true)
@@ -129,41 +132,55 @@ public class RiaApartmentParser {
                 return false;
             }
 
-            hashHolder[0] = null;
+            String description = data.optString("description_uk");
+            int price = data.optInt("price");
+            int floor = data.optInt("floor");
+            int floorsCount = data.optInt("floors_count");
+            String district = data.optString("district_name_uk");
+            String street = data.optString("street_name_uk");
+            String building = data.optString("building_number_str");
+            int rooms = data.optInt("rooms_count");
+            double area = data.optDouble("total_square_meters");
+            String address = street + ", буд. " + building;
+
+            List<String> photoPaths = new ArrayList<>();
+            JSONObject photosObj = data.optJSONObject("photos");
+            if (photosObj != null) {
+                String slug = beautifulUrl.replaceAll("-\\d+\\.html$", "");
+                int counter = 1;
+                for (String key : photosObj.keySet()) {
+                    JSONObject photoData = photosObj.getJSONObject(key);
+                    String photoId = photoData.optString("id");
+                    if (photoId != null && !photoId.isEmpty()) {
+                        String photoUrl = "https://cdn.riastatic.com/photosnew/dom/photo/" + slug + "__" + photoId + "b.jpg";
+                        String photoFileName = "photos/" + id + "_" + counter + ".jpg";
+                        try (InputStream in = new URL(photoUrl).openStream()) {
+                            Files.createDirectories(Paths.get("photos"));
+                            Files.copy(in, Paths.get(photoFileName), StandardCopyOption.REPLACE_EXISTING);
+                            photoPaths.add(photoFileName);
+                            if (photoPaths.size() == 5) break;
+                            counter++;
+                        } catch (IOException e) {
+                            System.out.println("❌ Помилка при завантаженні фото " + photoUrl);
+                        }
+                    }
+                }
+            }
+
             driver.get("https://dom.ria.com/uk/" + beautifulUrl);
             Thread.sleep(2000);
+            fetchAndPrintPhone(hashHolder, phoneHolder);
 
-            printApartmentDetails(data);
-            fetchAndPrintPhone(hashHolder);
-            downloadPhotos(data, id, beautifulUrl);
-
+            insertApartment(id, description, address, price, phoneHolder[0], floor, floorsCount, rooms, area, photoPaths.toArray(new String[0]));
             return true;
+
         } catch (Exception ex) {
             System.out.println("⛔ Помилка при обробці ID " + id + ": " + ex.getMessage());
             return false;
         }
     }
 
-    private static void printApartmentDetails(JSONObject data) {
-        String description = data.optString("description_uk");
-        int price = data.optInt("price");
-        int floor = data.optInt("floor");
-        int floorsCount = data.optInt("floors_count");
-        String district = data.optString("district_name_uk");
-        String street = data.optString("street_name_uk");
-        String building = data.optString("building_number_str");
-        int rooms = data.optInt("rooms_count");
-        double area = data.optDouble("total_square_meters");
-        String address = street + ", буд. " + building;
-
-        System.out.println("\n\uD83D\uDCC1 Оголошення:");
-        System.out.printf("Оренда %d-кімнатної квартири по вул. %s (%s)\n", rooms, address, district);
-        System.out.printf("\uD83D\uDCB5 %d грн + комунальні послуги\n", price);
-        System.out.printf("\uD83C\uDFE2 %d поверх з %d\n", floor, floorsCount);
-        System.out.println("\uD83C\uDFE1 " + description);
-    }
-
-    private static void fetchAndPrintPhone(String[] hashHolder) throws Exception {
+    private static void fetchAndPrintPhone(String[] hashHolder, String[] phoneHolder) throws Exception {
         String hash = hashHolder[0];
         if (hash != null) {
             String apiUrl = "https://dom.ria.com/v1/api/realty/getOwnerAndAgencyData/" + hash + "?spa_final_page=true";
@@ -173,35 +190,13 @@ public class RiaApartmentParser {
                     .execute().body());
 
             String phone = obj.getJSONObject("owner").getJSONArray("phones").getJSONObject(0).getString("phone_num");
-            System.out.println("\uD83D\uDCDE Номер телефону: " + phone);
+            phoneHolder[0] = phone;
+            System.out.println("📞 Номер телефону: " + phone);
         } else {
             System.out.println("❌ Hash не перехоплено.");
+            phoneHolder[0] = null;
         }
         System.out.println("──────────────────────────────");
-    }
-
-    private static void downloadPhotos(JSONObject data, int id, String beautifulUrl) {
-        JSONObject photosObj = data.optJSONObject("photos");
-        if (photosObj == null || photosObj.isEmpty()) return;
-
-        String slug = beautifulUrl.replaceAll("-\\d+\\.html$", "");
-        int counter = 1;
-
-        for (String key : photosObj.keySet()) {
-            JSONObject photoData = photosObj.getJSONObject(key);
-            String photoId = photoData.optString("id");
-            if (photoId == null || photoId.isEmpty()) continue;
-
-            String fullUrl = "https://cdn.riastatic.com/photosnew/dom/photo/" + slug + "__" + photoId + "b.jpg";
-
-            try (InputStream in = new URL(fullUrl).openStream()) {
-                Files.createDirectories(Paths.get("photos"));
-                Files.copy(in, Paths.get("photos/" + id + "_" + counter + ".jpg"), StandardCopyOption.REPLACE_EXISTING);
-                counter++;
-            } catch (IOException e) {
-                System.out.println("❌ Помилка при завантаженні фото " + fullUrl);
-            }
-        }
     }
 
     private static class ParserStats {
