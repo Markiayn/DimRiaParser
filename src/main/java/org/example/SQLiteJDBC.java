@@ -44,8 +44,8 @@ public class SQLiteJDBC {
         }
     }
 
-    public static void insertApartment(int id, String desc, String address, int price, String phone,  int floor, int floors, int rooms, double area, String[] photos, String CreatedAt) {
-        String sql = "INSERT OR IGNORE INTO Apartments " +
+    public static void insertApartment(String table_name, int id, String desc, String address, int price, String phone,  int floor, int floors, int rooms, double area, String[] photos, String CreatedAt) {
+        String sql = "INSERT OR IGNORE INTO  " + table_name +
                 "(ID, Description, Address, Price, Phone, Floor, FloorsCount, Rooms, Area, " +
                 "Photo1, Photo2, Photo3, Photo4, Photo5, Posted, CreatedAt) " +
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
@@ -75,6 +75,7 @@ public class SQLiteJDBC {
 
 
             System.out.println("Apartment inserted with ID: " + id);
+            System.out.println("➡️ Вставка у таблицю: " + table_name);
 
         } catch (SQLException e) {
             System.err.println("Insert error: " + e.getMessage());
@@ -134,4 +135,19 @@ public class SQLiteJDBC {
             System.err.println("Delete error: " + e.getMessage());
         }
     }
+
+    public static void deleteAllFrom(String tableName) {
+        String sql = "DELETE FROM " + tableName;
+
+        try (Connection c = DriverManager.getConnection("jdbc:sqlite:test.db");
+             PreparedStatement pstmt = c.prepareStatement(sql)) {
+
+            pstmt.executeUpdate();
+            System.out.println("✅ Видалено всі записи з таблиці: " + tableName);
+
+        } catch (SQLException e) {
+            System.err.println("❌ Помилка видалення з таблиці " + tableName + ": " + e.getMessage());
+        }
+    }
+
 }

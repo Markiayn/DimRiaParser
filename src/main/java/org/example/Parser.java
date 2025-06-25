@@ -24,21 +24,23 @@ public class Parser {
 
     public static void main(String[] args) throws Exception {
         parseRiaApartments(
+                "Apartments_IvanoFrankivsk",
                 "src/main/java/org/example/chromedriver-win64/chromedriver.exe",
-                5,        // область (Львівська)
-                null,     // місто (null якщо не потрібно)
-                2,        // тип нерухомості (2 = квартира)
-                3,        // тип операції (3 = оренда)
-                24,       // години ліміту по публікації
-                2,        // кількість сторінок
-                1,        // мін. кімнат
-                25.0,     // мін. площа
-                5,        // макс. фото
-                true      // verbose
+                15,
+                null,
+                2,
+                3,
+                24,
+                2,
+                1,
+                25.0,
+                5,
+                true
         );
     }
 
     public static void parseRiaApartments(
+            String table_name,
             String chromeDriverPath,
             int regionId,
             Integer cityId,
@@ -93,7 +95,7 @@ public class Parser {
 
             for (int i = 0; i < items.length(); i++) {
                 int id = items.getInt(i);
-                if (processApartmentWithFilters(id, driver, formatter, hashHolder, phoneHolder, hoursLimit, stats, minRooms, minArea, maxPhotos, verbose)) {
+                if (processApartmentWithFilters(table_name, id, driver, formatter, hashHolder, phoneHolder, hoursLimit, stats, minRooms, minArea, maxPhotos, verbose)) {
                     stats.shown++;
                 }
             }
@@ -103,7 +105,7 @@ public class Parser {
         stats.printSummary(hoursLimit);
     }
 
-    private static boolean processApartmentWithFilters(int id, ChromeDriver driver, DateTimeFormatter formatter, String[] hashHolder,
+    private static boolean processApartmentWithFilters(String table_name,int id, ChromeDriver driver, DateTimeFormatter formatter, String[] hashHolder,
                                                        String[] phoneHolder, int hoursLimit, ParserStats stats,
                                                        int minRooms, double minArea, int maxPhotos, boolean verbose) {
         try {
@@ -150,18 +152,41 @@ public class Parser {
                 for (String key : photosObj.keySet()) {
                     JSONObject photoData = photosObj.getJSONObject(key);
                     String photoId = photoData.optString("id");
+                    String filePath = photoData.optString("file");
+                    String photoFileName = "photos/" + id + "_" + counter + ".jpg";
+                    boolean downloaded = false;
+
+                    Files.createDirectories(Paths.get("photos"));
+
                     if (photoId != null && !photoId.isEmpty()) {
-                        String photoUrl = "https://cdn.riastatic.com/photosnew/dom/photo/" + slug + "__" + photoId + "b.jpg";
-                        String photoFileName = "photos/" + id + "_" + counter + ".jpg";
-                        try (InputStream in = new URL(photoUrl).openStream()) {
-                            Files.createDirectories(Paths.get("photos"));
-                            Files.copy(in, Paths.get(photoFileName), StandardCopyOption.REPLACE_EXISTING);
-                            photoPaths.add(photoFileName);
-                            if (photoPaths.size() == maxPhotos) break;
-                            counter++;
-                        } catch (IOException e) {
-                            if (verbose) System.out.println("❌ Помилка при завантаженні фото " + photoUrl);
+                        String baseUrl = "https://cdn.riastatic.com/photosnew/dom/photo/" + slug + "__" + photoId;
+                        String[] suffixes = {"b.jpg", "fl.webp", "fl.jpg"};
+                        for (String suffix : suffixes) {
+                            String photoUrl = baseUrl + suffix;
+                            try (InputStream in = new URL(photoUrl).openStream()) {
+                                Files.copy(in, Paths.get(photoFileName), StandardCopyOption.REPLACE_EXISTING);
+                                downloaded = true;
+                                break;
+                            } catch (IOException e) {
+                                if (verbose) System.out.println("⚠️ Не вдалося завантажити фото: " + photoUrl);
+                            }
                         }
+                    }
+
+                    if (!downloaded && filePath != null && !filePath.isEmpty()) {
+                        String fallbackUrl = "https://cdn.riastatic.com/photosnew/" + filePath;
+                        try (InputStream in = new URL(fallbackUrl).openStream()) {
+                            Files.copy(in, Paths.get(photoFileName), StandardCopyOption.REPLACE_EXISTING);
+                            downloaded = true;
+                        } catch (IOException e) {
+                            if (verbose) System.out.println("⚠️ Не вдалося завантажити fallback-фото: " + fallbackUrl);
+                        }
+                    }
+
+                    if (downloaded) {
+                        photoPaths.add(photoFileName);
+                        counter++;
+                        if (photoPaths.size() == maxPhotos) break;
                     }
                 }
             }
@@ -170,7 +195,7 @@ public class Parser {
             Thread.sleep(2000);
             fetchAndPrintPhone(hashHolder, phoneHolder);
 
-            insertApartment(id, description, address, price, phoneHolder[0], floor, floorsCount, rooms, area, photoPaths.toArray(new String[0]), pubDateStr);
+            insertApartment(table_name, id, description, address, price, phoneHolder[0], floor, floorsCount, rooms, area, photoPaths.toArray(new String[0]), pubDateStr);
             return true;
 
         } catch (Exception ex) {
