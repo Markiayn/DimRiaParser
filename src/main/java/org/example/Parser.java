@@ -4,6 +4,9 @@ import org.jsoup.Connection;
 import org.jsoup.Jsoup;
 import org.json.*;
 
+import org.openqa.selenium.By;
+import org.openqa.selenium.JavascriptExecutor;
+import org.openqa.selenium.WebElement;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chrome.ChromeOptions;
 import org.openqa.selenium.devtools.DevTools;
@@ -21,6 +24,8 @@ import java.util.regex.*;
 import static org.example.SQLiteJDBC.*;
 
 public class Parser {
+
+    private static final List<String> interceptedFxPhotos = Collections.synchronizedList(new ArrayList<>());
 
     public static void main(String[] args) throws Exception {
         parseRiaApartments(
@@ -61,6 +66,13 @@ public class Parser {
         DevTools devTools = setupDevTools(driver);
         String[] hashHolder = setupHashListener(devTools);
         String[] phoneHolder = new String[1];
+
+        devTools.addListener(Network.requestWillBeSent(), request -> {
+            String url = request.getRequest().getUrl();
+            if (url.endsWith("fx.webp") && url.contains("photosnew/dom/photo/")) {
+                interceptedFxPhotos.add(url);
+            }
+        });
 
         ParserStats stats = new ParserStats();
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
@@ -144,69 +156,57 @@ public class Parser {
             String building = data.optString("building_number_str");
             String address = street + ", буд. " + building;
 
-            List<String> photoPaths = new ArrayList<>();
-            JSONObject photosObj = data.optJSONObject("photos");
-            if (photosObj != null) {
-                String slug = beautifulUrl.replaceAll("-\\d+\\.html$", "");
-                int counter = 1;
-                for (String key : photosObj.keySet()) {
-                    JSONObject photoData = photosObj.getJSONObject(key);
-                    String photoId = photoData.optString("id");
-                    String filePath = photoData.optString("file");
-                    String photoFileName = "photos/" + id + "_" + counter + ".jpg";
-                    boolean downloaded = false;
+            driver.get("https://dom.ria.com/uk/" + beautifulUrl);
 
-                    Files.createDirectories(Paths.get("photos"));
+            try {
+                WebElement showAllPhotosButton = driver.findElement(By.cssSelector("li[class*='photo-'] span.all-photos"));
+                ((JavascriptExecutor) driver).executeScript("arguments[0].click();", showAllPhotosButton);
+                if (verbose) System.out.println("🖼 Натиснуто ' Дивитися всі фото'");
+            } catch (Exception e) {
+                if (verbose) System.out.println("⚠️ Кнопка ' Дивитися всі фото' не знайдена");
+            }
 
-                    if (photoId != null && !photoId.isEmpty()) {
-                        String baseUrl = "https://cdn.riastatic.com/photosnew/dom/photo/" + slug + "__" + photoId;
-                        String[] suffixes = {"b.jpg", "fl.webp", "fl.jpg"};
-                        for (String suffix : suffixes) {
-                            String photoUrl = baseUrl + suffix;
-                            try (InputStream in = new URL(photoUrl).openStream()) {
-                                Files.copy(in, Paths.get(photoFileName), StandardCopyOption.REPLACE_EXISTING);
-                                downloaded = true;
-                                break;
-                            } catch (IOException e) {
-                                if (verbose) System.out.println("⚠️ Не вдалося завантажити фото: " + photoUrl);
-                            }
-                        }
-                    }
-
-                    if (!downloaded && filePath != null && !filePath.isEmpty()) {
-                        String fallbackUrl = "https://cdn.riastatic.com/photosnew/" + filePath;
-                        try (InputStream in = new URL(fallbackUrl).openStream()) {
-                            Files.copy(in, Paths.get(photoFileName), StandardCopyOption.REPLACE_EXISTING);
-                            downloaded = true;
-                        } catch (IOException e) {
-                            if (verbose) System.out.println("⚠️ Не вдалося завантажити fallback-фото: " + fallbackUrl);
-                        }
-                    }
-
-                    if (downloaded) {
-                        photoPaths.add(photoFileName);
-                        counter++;
-                        if (photoPaths.size() == maxPhotos) break;
-                    }
+            for (int i = 0; i < 5; i++) {
+                try {
+                    WebElement nextButton = driver.findElement(By.cssSelector("button.rotate-btn.rotate-arr-r"));
+                    ((JavascriptExecutor) driver).executeScript("arguments[0].click();", nextButton);
+                    Thread.sleep(500);
+                } catch (Exception e) {
+                    break;
                 }
             }
 
-            driver.get("https://dom.ria.com/uk/" + beautifulUrl);
-            Thread.sleep(2000);
+            Thread.sleep(1500);
+
+            List<String> photoPaths = new ArrayList<>();
+            int counter = 1;
+
+            for (String photoUrl : interceptedFxPhotos) {
+                String photoFileName = "photos/" + id + "_net_" + counter + ".webp";
+
+                try (InputStream in = new URL(photoUrl).openStream()) {
+                    Files.createDirectories(Paths.get("photos"));
+                    Files.copy(in, Paths.get(photoFileName), StandardCopyOption.REPLACE_EXISTING);
+                    photoPaths.add(photoFileName);
+                    counter++;
+                    if (photoPaths.size() >= maxPhotos) break;
+                } catch (IOException ignored) {}
+            }
+            interceptedFxPhotos.clear();
+
             fetchAndPrintPhone(hashHolder, phoneHolder);
 
             insertApartment(table_name, id, description, address, price, phoneHolder[0], floor, floorsCount, rooms, area, photoPaths.toArray(new String[0]), pubDateStr);
             return true;
 
         } catch (Exception ex) {
-            if (verbose) System.out.println("⛔ Помилка при обробці ID " + id + ": " + ex.getMessage());
+            if (verbose) System.out.println("⛔️ Помилка при обробці ID " + id + ": " + ex.getMessage());
             return false;
         }
     }
 
     private static ChromeDriver setupDriver() {
         ChromeOptions options = new ChromeOptions();
-        options.addArguments("--headless");
         options.addArguments("--disable-blink-features=AutomationControlled");
         options.addArguments("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/115.0.0.0 Safari/537.36");
         ChromeDriver driver = new ChromeDriver(options);
