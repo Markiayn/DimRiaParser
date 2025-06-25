@@ -26,12 +26,15 @@ public class SQLiteJDBC {
         try (Connection c = DriverManager.getConnection("jdbc:sqlite:test.db");
              Statement stmt = c.createStatement()) {
 
-            String sql = "CREATE TABLE IF NOT EXISTS Apartments " +
-                    "(ID INTEGER PRIMARY KEY NOT NULL, " +
-                    "Description TEXT, Address TEXT, Price INT, Phone TEXT," +
-                    " Floor INT, FloorsCount INT, " +
+            String sql = "CREATE TABLE IF NOT EXISTS Apartments (" +
+                    "ID INTEGER PRIMARY KEY NOT NULL, " +
+                    "Description TEXT, Address TEXT, Price INT, Phone TEXT, " +
+                    "Floor INT, FloorsCount INT, " +
                     "Rooms INT, Area REAL, " +
-                    "Photo1 TEXT, Photo2 TEXT, Photo3 TEXT, Photo4 TEXT, Photo5 TEXT)";
+                    "Photo1 TEXT, Photo2 TEXT, Photo3 TEXT, Photo4 TEXT, Photo5 TEXT, " +
+                    "Posted BOOLEAN DEFAULT 0, " +
+                    "CreatedAt TEXT)";
+
 
             stmt.executeUpdate(sql);
             System.out.println("Table created successfully");
@@ -41,9 +44,13 @@ public class SQLiteJDBC {
         }
     }
 
-    public static void insertApartment(int id, String desc, String address, int price, String phone,  int floor, int floors, int rooms, double area, String[] photos) {
-        String sql = "INSERT OR IGNORE INTO Apartments (ID, Description, Address, Price, Phone, Floor, FloorsCount, Rooms, Area, Photo1, Photo2, Photo3, Photo4, Photo5) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+    public static void insertApartment(int id, String desc, String address, int price, String phone,  int floor, int floors, int rooms, double area, String[] photos, String CreatedAt) {
+        String sql = "INSERT OR IGNORE INTO Apartments " +
+                "(ID, Description, Address, Price, Phone, Floor, FloorsCount, Rooms, Area, " +
+                "Photo1, Photo2, Photo3, Photo4, Photo5, Posted, CreatedAt) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+
+
 
         try (Connection c = DriverManager.getConnection("jdbc:sqlite:test.db");
              PreparedStatement pstmt = c.prepareStatement(sql)) {
@@ -58,9 +65,14 @@ public class SQLiteJDBC {
             pstmt.setInt(8, rooms);
             pstmt.setDouble(9, area);
             for (int i = 0; i < 5; i++) {
-                pstmt.setString(9 + i, photos.length > i ? photos[i] : null);
+                pstmt.setString(10 + i, photos.length > i ? photos[i] : null);
             }
+
+            pstmt.setBoolean(15, false);
+            pstmt.setString(16, CreatedAt);
+
             pstmt.executeUpdate();
+
 
             System.out.println("Apartment inserted with ID: " + id);
 
@@ -80,7 +92,8 @@ public class SQLiteJDBC {
                 System.out.printf("\nID: %d\nОпис: %s\nАдреса: %s\nЦіна: %d грн\nПоверх: %d з %d\nКімнат: %d\nПлоща: %.1f м²\nФото: [%s, %s, %s, %s, %s]\n",
                         rs.getInt("ID"), rs.getString("Description"), rs.getString("Address"), rs.getInt("Price"),rs.getString("Phone"),
                         rs.getInt("Floor"), rs.getInt("FloorsCount"), rs.getInt("Rooms"), rs.getDouble("Area"),
-                        rs.getString("Photo1"), rs.getString("Photo2"), rs.getString("Photo3"), rs.getString("Photo4"), rs.getString("Photo5"));
+                        rs.getString("Photo1"), rs.getString("Photo2"), rs.getString("Photo3"), rs.getString("Photo4"), rs.getString("Photo5"),
+                        rs.getBoolean("Posted"));
             }
 
         } catch (SQLException e) {
