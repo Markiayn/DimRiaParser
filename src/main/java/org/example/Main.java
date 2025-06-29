@@ -1,57 +1,65 @@
 package org.example;
 
-import org.example.SQLiteJDBC;
-import org.example.FileUtils;
-
-import static org.example.Parser.parseRiaApartments;
+import org.example.config.AppConfig;
+import org.example.database.DatabaseManager;
+import org.example.service.RiaParserService;
+import org.example.utils.FileUtils;
 
 public class Main {
 
     public static void main(String[] args) throws Exception {
+        System.out.println("🏠 Запуск парсера нерухомості Dom.ria");
+        System.out.println("=====================================");
 
-        SQLiteJDBC  sql = new SQLiteJDBC();
-        FileUtils fileUtils = new FileUtils();
+        // Ініціалізуємо сервіси
+        DatabaseManager databaseManager = DatabaseManager.getInstance();
+        RiaParserService parserService = new RiaParserService();
 
-        sql.deleteAllFrom("Apartments");
-        sql.deleteAllFrom("Apartments_Lviv");
-        sql.deleteAllFrom("Apartments_IvanoFrankivsk");
-        fileUtils.deleteAllPhotos("photos");
+        // Очищаємо старі дані
+        System.out.println("\n🧹 Очищення старих даних...");
+        databaseManager.deleteAllFromTable("Apartments_Lviv");
+        databaseManager.deleteAllFromTable("Apartments_IvanoFrankivsk");
+        FileUtils.deleteAllPhotos(AppConfig.getPhotosDirectory());
 
-        //Lviv
-        parseRiaApartments(
+        // Парсимо Львів
+        System.out.println("\n🏙 Парсинг Львівської області...");
+        parserService.parseApartments(
                 "Apartments_Lviv",
-                "src/main/java/org/example/chromedriver-win64/chromedriver.exe",
                 5,        // область (Львівська)
                 null,     // місто (null якщо не потрібно)
                 2,        // тип нерухомості (2 = квартира)
                 3,        // тип операції (3 = оренда)
-                48,       // години ліміту по публікації
-                2,        // кількість сторінок
-                1,        // мін. кімнат
-                25.0,     // мін. площа
-                5,        // макс. фото
-                true      // verbose
+                AppConfig.getHoursLimit(),
+                AppConfig.getMaxPages(),
+                AppConfig.getMinRooms(),
+                AppConfig.getMinArea(),
+                AppConfig.getMaxPhotosPerApartment()
         );
 
-
-        //Frankivsk
-        parseRiaApartments(
+        // Парсимо Івано-Франківськ
+        System.out.println("\n🏙 Парсинг Івано-Франківської області...");
+        parserService.parseApartments(
                 "Apartments_IvanoFrankivsk",
-                "src/main/java/org/example/chromedriver-win64/chromedriver.exe",
-                15,        // область (Івано*Франківська)
+                15,       // область (Івано-Франківська)
                 null,     // місто (null якщо не потрібно)
                 2,        // тип нерухомості (2 = квартира)
                 3,        // тип операції (3 = оренда)
-                48,       // години ліміту по публікації
-                2,        // кількість сторінок
-                1,        // мін. кімнат
-                25.0,     // мін. площа
-                5,        // макс. фото
-                true      // verbose
+                AppConfig.getHoursLimit(),
+                AppConfig.getMaxPages(),
+                AppConfig.getMinRooms(),
+                AppConfig.getMinArea(),
+                AppConfig.getMaxPhotosPerApartment()
         );
 
-//        TelegramPostDispatcher dispatcher = new TelegramPostDispatcher();
-//        dispatcher.dispatchPosts(2); // або скільки хочеш постів на місто
+        System.out.println("\n✅ Парсинг завершено!");
+        System.out.println("📊 Статистика:");
+        System.out.println("   - Львівська область: " + databaseManager.getUnpostedApartments("Apartments_Lviv", 1000).size() + " квартир");
+        System.out.println("   - Івано-Франківська область: " + databaseManager.getUnpostedApartments("Apartments_IvanoFrankivsk", 1000).size() + " квартир");
+        System.out.println("   - Фотографії: " + FileUtils.getFileCount(AppConfig.getPhotosDirectory()) + " файлів (" + 
+                          FileUtils.formatFileSize(FileUtils.getDirectorySize(AppConfig.getPhotosDirectory())) + ")");
 
+        // Розкоментуйте для відправки в Telegram
+        // TelegramPostDispatcher dispatcher = new TelegramPostDispatcher();
+        // dispatcher.dispatchPosts(2); // або скільки хочете постів на місто
     }
 }
