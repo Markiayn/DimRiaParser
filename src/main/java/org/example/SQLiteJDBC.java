@@ -150,4 +150,52 @@ public class SQLiteJDBC {
         }
     }
 
+    // Метод для отримання неопублікованих постів (універсальний)
+    public static ResultSet getUnpostedApartments(String tableName) {
+        String sql = "SELECT * FROM " + tableName + " WHERE Posted = 0 ORDER BY CreatedAt DESC LIMIT 1";
+
+        try {
+            Connection c = DriverManager.getConnection("jdbc:sqlite:test.db");
+            Statement stmt = c.createStatement();
+            return stmt.executeQuery(sql);
+        } catch (SQLException e) {
+            System.err.println("❌ Помилка отримання неопублікованих постів: " + e.getMessage());
+            return null;
+        }
+    }
+
+    // Метод для оновлення статусу posted (універсальний)
+    public static void markAsPosted(String tableName, int id) {
+        String sql = "UPDATE " + tableName + " SET Posted = 1 WHERE ID = ?";
+
+        try (Connection c = DriverManager.getConnection("jdbc:sqlite:test.db");
+             PreparedStatement pstmt = c.prepareStatement(sql)) {
+
+            pstmt.setInt(1, id);
+            int affected = pstmt.executeUpdate();
+
+            if (affected > 0) {
+                System.out.println("✅ Пост з ID " + id + " у таблиці " + tableName + " позначено як опублікований");
+            } else {
+                System.out.println("⚠️ Пост з ID " + id + " у таблиці " + tableName + " не знайдено");
+            }
+
+        } catch (SQLException e) {
+            System.err.println("❌ Помилка оновлення статусу: " + e.getMessage());
+        }
+    }
+
+    // Метод для отримання N найновіших неопублікованих постів (універсальний)
+    public static ResultSet getUnpostedApartmentsLimit(String tableName, int limit) {
+        String sql = "SELECT * FROM " + tableName + " WHERE Posted = 0 ORDER BY CreatedAt DESC LIMIT " + limit;
+        try {
+            Connection c = DriverManager.getConnection("jdbc:sqlite:test.db");
+            Statement stmt = c.createStatement();
+            return stmt.executeQuery(sql);
+        } catch (SQLException e) {
+            System.err.println("❌ Помилка отримання неопублікованих постів: " + e.getMessage());
+            return null;
+        }
+    }
+
 }

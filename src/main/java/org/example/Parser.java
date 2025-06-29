@@ -35,7 +35,7 @@ public class Parser {
                 null,
                 2,
                 3,
-                24,
+                48,
                 2,
                 1,
                 25.0,
