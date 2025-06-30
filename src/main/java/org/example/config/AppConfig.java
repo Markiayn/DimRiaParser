@@ -17,8 +17,9 @@ public class AppConfig {
     }
     
     private static void setDefaultProperties() {
-        properties.setProperty("chrome.driver.path", "src/main/java/org/example/chromedriver-win64/chromedriver.exe");
+        properties.setProperty("chrome.driver.path", "chromedriver-win64/chromedriver.exe");
         properties.setProperty("database.url", "jdbc:sqlite:test.db");
+        properties.setProperty("table.name", "apartments");
         properties.setProperty("photos.directory", "photos");
         properties.setProperty("max.photos.per.apartment", "5");
         properties.setProperty("hours.limit", "48");
@@ -26,6 +27,9 @@ public class AppConfig {
         properties.setProperty("min.rooms", "1");
         properties.setProperty("min.area", "25.0");
         properties.setProperty("verbose", "true");
+        properties.setProperty("telegram.bot.token", "your_bot_token_here");
+        properties.setProperty("telegram.chat.id1", "your_chat_id1_here");
+        properties.setProperty("telegram.chat.id2", "your_chat_id2_here");
     }
     
     public static String getChromeDriverPath() {
@@ -34,6 +38,10 @@ public class AppConfig {
     
     public static String getDatabaseUrl() {
         return properties.getProperty("database.url");
+    }
+    
+    public static String getTableName() {
+        return properties.getProperty("table.name");
     }
     
     public static String getPhotosDirectory() {
@@ -62,5 +70,17 @@ public class AppConfig {
     
     public static boolean isVerbose() {
         return Boolean.parseBoolean(properties.getProperty("verbose"));
+    }
+    
+    public static String getTelegramBotToken() {
+        return properties.getProperty("telegram.bot.token");
+    }
+    
+    public static String getTelegramChatId1() {
+        return properties.getProperty("telegram.chat.id1");
+    }
+    
+    public static String getTelegramChatId2() {
+        return properties.getProperty("telegram.chat.id2");
     }
 } 

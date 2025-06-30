@@ -37,6 +37,86 @@ public class RiaParserService {
         this.verbose = AppConfig.isVerbose();
     }
     
+    /**
+     * Парсить квартири з налаштуваннями з конфігурації
+     */
+    public void parseApartments() {
+        // Очищаємо старі фотографії
+        org.example.utils.FileUtils.deleteAllPhotos(photosDirectory);
+        
+        // Парсимо Львівську область
+        System.out.println("🏙 Парсинг Львівської області...");
+        parseApartments(
+            "Apartments_Lviv",
+            5,        // область (Львівська)
+            null,     // місто
+            2,        // тип нерухомості (квартира)
+            3,        // тип операції (оренда)
+            AppConfig.getHoursLimit(),
+            AppConfig.getMaxPages(),
+            AppConfig.getMinRooms(),
+            AppConfig.getMinArea(),
+            AppConfig.getMaxPhotosPerApartment()
+        );
+        
+        // Парсимо Івано-Франківську область
+        System.out.println("🏙 Парсинг Івано-Франківської області...");
+        parseApartments(
+            "Apartments_IvanoFrankivsk",
+            15,       // область (Івано-Франківська)
+            null,     // місто
+            2,        // тип нерухомості (квартира)
+            3,        // тип операції (оренда)
+            AppConfig.getHoursLimit(),
+            AppConfig.getMaxPages(),
+            AppConfig.getMinRooms(),
+            AppConfig.getMinArea(),
+            AppConfig.getMaxPhotosPerApartment()
+        );
+    }
+    
+    /**
+     * Тестовий парсинг - по 5 записів з кожного міста
+     */
+    public void parseTestApartments() {
+        System.out.println("🧪 Запуск тестового парсингу (по 5 записів з кожного міста)...");
+        
+        // Очищаємо старі фотографії
+        org.example.utils.FileUtils.deleteAllPhotos(photosDirectory);
+        
+        // Парсимо Львівську область (тестовий режим)
+        System.out.println("🏙 Тестовий парсинг Львівської області...");
+        parseApartments(
+            "Apartments_Lviv",
+            5,        // область (Львівська)
+            null,     // місто
+            2,        // тип нерухомості (квартира)
+            3,        // тип операції (оренда)
+            48,       // години (більший діапазон для тесту)
+            1,        // тільки 1 сторінка
+            AppConfig.getMinRooms(),
+            AppConfig.getMinArea(),
+            3         // максимум 3 фото для тесту
+        );
+        
+        // Парсимо Івано-Франківську область (тестовий режим)
+        System.out.println("🏙 Тестовий парсинг Івано-Франківської області...");
+        parseApartments(
+            "Apartments_IvanoFrankivsk",
+            15,       // область (Івано-Франківська)
+            null,     // місто
+            2,        // тип нерухомості (квартира)
+            3,        // тип операції (оренда)
+            48,       // години (більший діапазон для тесту)
+            1,        // тільки 1 сторінка
+            AppConfig.getMinRooms(),
+            AppConfig.getMinArea(),
+            3         // максимум 3 фото для тесту
+        );
+        
+        System.out.println("✅ Тестовий парсинг завершено!");
+    }
+    
     public void parseApartments(String tableName, int regionId, Integer cityId, 
                                int realtyType, int operationType, int hoursLimit, 
                                int maxPages, int minRooms, double minArea, int maxPhotos) {

@@ -107,6 +107,59 @@ public class DatabaseManager {
         return apartments;
     }
     
+    /**
+     * Отримує неопубліковані квартири з останньої години
+     */
+    public List<Apartment> getUnpostedApartmentsFromLastHour(String tableName, int limit) {
+        String sql = String.format(
+            "SELECT * FROM %s WHERE Posted = 0 AND CreatedAt >= ? ORDER BY CreatedAt DESC LIMIT ?", 
+            tableName
+        );
+        List<Apartment> apartments = new ArrayList<>();
+        
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            
+            // Встановлюємо час - 1 година тому
+            LocalDateTime oneHourAgo = LocalDateTime.now().minusHours(1);
+            String oneHourAgoStr = oneHourAgo.format(formatter);
+            
+            pstmt.setString(1, oneHourAgoStr);
+            pstmt.setInt(2, limit);
+            ResultSet rs = pstmt.executeQuery();
+            
+            while (rs.next()) {
+                apartments.add(mapResultSetToApartment(rs));
+            }
+            
+        } catch (SQLException e) {
+            System.err.println("❌ Помилка отримання квартир з останньої години: " + e.getMessage());
+        }
+        
+        return apartments;
+    }
+    
+    /**
+     * Отримує неопубліковані квартири (без параметра tableName)
+     */
+    public List<Apartment> getUnpostedApartments() {
+        return getUnpostedApartments(AppConfig.getTableName(), 10);
+    }
+    
+    /**
+     * Отримує неопубліковані квартири з останньої години (без параметра tableName)
+     */
+    public List<Apartment> getUnpostedApartmentsFromLastHour() {
+        return getUnpostedApartmentsFromLastHour(AppConfig.getTableName(), 10);
+    }
+    
+    /**
+     * Позначає квартиру як опубліковану (без параметра tableName)
+     */
+    public void markApartmentAsPublished(int id) {
+        markAsPosted(AppConfig.getTableName(), id);
+    }
+    
     public Optional<Apartment> getApartmentById(String tableName, int id) {
         String sql = String.format("SELECT * FROM %s WHERE ID = ?", tableName);
         
