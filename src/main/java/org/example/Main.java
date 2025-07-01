@@ -118,6 +118,11 @@ public class Main {
                 fullTestScheduler.runFullTestMode();
                 break;
                 
+            case "testcycle":
+                System.out.println("🧪 Запуск тестового циклу з кастомним таймінгом...");
+                runTestCycle();
+                break;
+                
             default:
                 System.err.println("❌ Невідома команда: " + command);
                 printUsage();
@@ -135,7 +140,8 @@ public class Main {
             System.out.println("3. 🤖 Автоматичний режим");
             System.out.println("4. 🧪 Тестовий постинг");
             System.out.println("5. 🧪 Повний тестовий режим");
-            System.out.println("6. ❌ Вихід");
+            System.out.println("6. 🧪 Тестовий цикл з кастомним таймінгом");
+            System.out.println("7. ❌ Вихід");
             System.out.print("Ваш вибір: ");
             
             String choice = scanner.nextLine().trim();
@@ -162,6 +168,10 @@ public class Main {
                     break;
                     
                 case "6":
+                    runTestCycle();
+                    break;
+                    
+                case "7":
                     System.out.println("👋 До побачення!");
                     return;
                     
@@ -233,6 +243,30 @@ public class Main {
         }
     }
     
+    private static void runTestCycle() {
+        Scanner scanner = new Scanner(System.in);
+        System.out.println("\n🧪 Запуск тестового циклу з кастомним таймінгом...");
+        System.out.print("Введіть затримку перед стартом (сек): ");
+        int startDelay = readInt(scanner, 2);
+        System.out.print("Введіть затримку між парсингом і ранковим постингом (сек): ");
+        int morningDelay = readInt(scanner, 2);
+        System.out.print("Введіть затримку між кожним 'щогодинним' постингом (сек): ");
+        int hourlyDelay = readInt(scanner, 2);
+        System.out.print("Введіть кількість ітерацій 'щогодинного' постингу: ");
+        int hourlyIterations = readInt(scanner, 3);
+        AutoPostingScheduler scheduler = new AutoPostingScheduler();
+        scheduler.runFullTestCycle(startDelay, morningDelay, hourlyDelay, hourlyIterations);
+    }
+    
+    private static int readInt(Scanner scanner, int defaultValue) {
+        String input = scanner.nextLine().trim();
+        try {
+            return Integer.parseInt(input);
+        } catch (NumberFormatException e) {
+            return defaultValue;
+        }
+    }
+    
     private static void printUsage() {
         System.out.println("\n📖 Використання:");
         System.out.println("  java -jar DimRiaParser.jar [команда]");
@@ -242,6 +276,7 @@ public class Main {
         System.out.println("  auto   - Автоматичний режим");
         System.out.println("  test   - Тестовий постинг");
         System.out.println("  testfull - Повний тестовий режим");
+        System.out.println("  testcycle - Тестовий цикл з кастомним таймінгом");
         System.out.println("\n💡 Без аргументів запускається інтерактивний режим");
     }
 }

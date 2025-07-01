@@ -226,4 +226,37 @@ public class AutoPostingScheduler {
             System.err.println("❌ Повний тестовий режим не вдався");
         }
     }
+    
+    /**
+     * Тестовий режим: імітує повний цикл автоматичного постингу з кастомним стартом і затримками
+     */
+    public void runFullTestCycle(int startDelay, int morningDelay, int hourlyDelay, int hourlyIterations) {
+        System.out.println("🧪 Тестовий режим: старт через " + startDelay + " сек, затримка між парсингом і ранковим постингом " + morningDelay + " сек, затримка між кожним 'щогодинним' постингом " + hourlyDelay + " сек, ітерацій: " + hourlyIterations);
+        try {
+            Thread.sleep(startDelay * 1000L);
+            // 1. Парсинг (як о 8:00)
+            runMorningParsing();
+            Thread.sleep(morningDelay * 1000L);
+            // 2. Ранковий постинг (як о 9:00)
+            runMorningPosting();
+            // 3. "Щогодинний" постинг (імітація циклу)
+            for (int i = 1; i <= hourlyIterations; i++) {
+                System.out.println("\n⏰ Тестовий щогодинний постинг #" + i);
+                runHourlyPosting();
+                if (i < hourlyIterations) Thread.sleep(hourlyDelay * 1000L);
+            }
+            System.out.println("=== Тестовий цикл завершено ===");
+        } catch (InterruptedException e) {
+            System.err.println("Тестовий режим перервано: " + e.getMessage());
+        }
+    }
+    
+    // Старий метод для сумісності
+    public void runFullTestCycle() {
+        int startDelay = AppConfig.getInt("testStartDelaySeconds", 2);
+        int morningDelay = AppConfig.getInt("testMorningDelaySeconds", 2);
+        int hourlyDelay = AppConfig.getInt("testHourlyDelaySeconds", 2);
+        int hourlyIterations = AppConfig.getInt("testHourlyIterations", 3);
+        runFullTestCycle(startDelay, morningDelay, hourlyDelay, hourlyIterations);
+    }
 } 

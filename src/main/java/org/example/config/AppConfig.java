@@ -83,4 +83,14 @@ public class AppConfig {
     public static String getTelegramChatId2() {
         return properties.getProperty("telegram.chat.id2");
     }
+    
+    public static int getInt(String key, int defaultValue) {
+        String value = properties.getProperty(key);
+        if (value == null) return defaultValue;
+        try {
+            return Integer.parseInt(value);
+        } catch (NumberFormatException e) {
+            return defaultValue;
+        }
+    }
 } 
