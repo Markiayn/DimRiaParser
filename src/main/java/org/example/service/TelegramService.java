@@ -290,8 +290,7 @@ public class TelegramService {
                 
                 // Додаємо підпис тільки до першого фото
                 if (i == 0) {
-                    mediaItem.put("caption", message);
-                    mediaItem.put("parse_mode", "Markdown");
+                    mediaItem.put("caption", message != null ? message.replace("*", "") : "");
                 }
                 
                 mediaArray.put(mediaItem);
@@ -312,16 +311,47 @@ public class TelegramService {
                 connection.data("photo" + i, photoFile.getName(), new java.io.FileInputStream(photoFile), "image/webp");
             }
             
-            String response = connection.execute().body();
-            
-            JSONObject responseJson = new JSONObject(response);
-            boolean success = responseJson.getBoolean("ok");
-            
-            if (!success && verbose) {
-                System.err.println("❌ Telegram API помилка: " + responseJson.optString("description", "Невідома помилка"));
+            String response = null;
+            try {
+                response = connection.execute().body();
+                JSONObject responseJson = new JSONObject(response);
+                boolean success = responseJson.getBoolean("ok");
+                if (!success && verbose) {
+                    System.err.println("❌ Telegram API помилка: " + responseJson.optString("description", "Невідома помилка"));
+                    // Повний лог
+                    System.err.println("=== ПОВНИЙ ЛОГ ВІДПРАВКИ sendMediaGroup ===");
+                    System.err.println("chatId: " + chatId);
+                    System.err.println("apartmentId: " + apartmentId);
+                    System.err.println("Кількість фото: " + photoFiles.size());
+                    for (File photoFile : photoFiles) {
+                        System.err.println("Фото: " + photoFile.getAbsolutePath() + " | Розмір: " + photoFile.length() + " байт");
+                    }
+                    System.err.println("Caption довжина: " + (message != null ? message.length() : 0));
+                    System.err.println("Caption: " + message);
+                    System.err.println("JSON mediaArray: " + mediaArray.toString());
+                    System.err.println("Відповідь Telegram: " + response);
+                    System.err.println("============================================");
+                }
+                return success;
+            } catch (Exception e) {
+                if (verbose) {
+                    System.err.println("❌ Помилка відправки групи медіа: " + e.getMessage());
+                    // Повний лог
+                    System.err.println("=== ПОВНИЙ ЛОГ ВІДПРАВКИ sendMediaGroup (EXCEPTION) ===");
+                    System.err.println("chatId: " + chatId);
+                    System.err.println("apartmentId: " + apartmentId);
+                    System.err.println("Кількість фото: " + photoFiles.size());
+                    for (File photoFile : photoFiles) {
+                        System.err.println("Фото: " + photoFile.getAbsolutePath() + " | Розмір: " + photoFile.length() + " байт");
+                    }
+                    System.err.println("Caption довжина: " + (message != null ? message.length() : 0));
+                    System.err.println("Caption: " + message);
+                    System.err.println("JSON mediaArray: " + mediaArray.toString());
+                    if (response != null) System.err.println("Відповідь Telegram: " + response);
+                    System.err.println("============================================");
+                }
+                return false;
             }
-            
-            return success;
             
         } catch (Exception e) {
             if (verbose) {
