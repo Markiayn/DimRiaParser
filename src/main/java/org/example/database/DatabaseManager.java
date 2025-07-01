@@ -154,6 +154,32 @@ public class DatabaseManager {
     }
     
     /**
+     * Отримує неопубліковані квартири з останніх 24 годин
+     */
+    public List<Apartment> getUnpostedApartmentsFromLast24Hours(String tableName, int limit) {
+        String sql = String.format(
+            "SELECT * FROM %s WHERE Posted = 0 AND CreatedAt >= ? ORDER BY CreatedAt DESC LIMIT ?",
+            tableName
+        );
+        List<Apartment> apartments = new ArrayList<>();
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            // Встановлюємо час - 24 години тому
+            LocalDateTime dayAgo = LocalDateTime.now().minusHours(24);
+            String dayAgoStr = dayAgo.format(formatter);
+            pstmt.setString(1, dayAgoStr);
+            pstmt.setInt(2, limit);
+            ResultSet rs = pstmt.executeQuery();
+            while (rs.next()) {
+                apartments.add(mapResultSetToApartment(rs));
+            }
+        } catch (SQLException e) {
+            System.err.println("❌ Помилка отримання квартир з останніх 24 годин: " + e.getMessage());
+        }
+        return apartments;
+    }
+    
+    /**
      * Позначає квартиру як опубліковану (без параметра tableName)
      */
     public void markApartmentAsPublished(int id) {

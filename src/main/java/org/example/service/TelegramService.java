@@ -130,10 +130,10 @@ public class TelegramService {
      * Форматує ціну
      */
     private String formatPrice(int price) {
-        if (price >= 1000) {
-            return String.format("%d грн/міс", price);
+        if (price < 2000) {
+            return String.format("%d $", price);
         } else {
-            return String.format("%d грн", price);
+            return String.format("%d грн/міс", price);
         }
     }
     

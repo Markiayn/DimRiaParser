@@ -80,16 +80,13 @@ public class PostingService {
         if (verbose) {
             System.out.println("🌅 Починаємо постинг ранкових оголошень...");
         }
-        
-        // Отримуємо квартири з обох таблиць
-        List<Apartment> lvivApartments = databaseManager.getUnpostedApartments("Apartments_Lviv", 5);
-        List<Apartment> ivanoFrankivskApartments = databaseManager.getUnpostedApartments("Apartments_IvanoFrankivsk", 5);
-        
+        // Отримуємо квартири з обох таблиць за останні 24 години
+        List<Apartment> lvivApartments = databaseManager.getUnpostedApartmentsFromLast24Hours("Apartments_Lviv", 2);
+        List<Apartment> ivanoFrankivskApartments = databaseManager.getUnpostedApartmentsFromLast24Hours("Apartments_IvanoFrankivsk", 2);
         // Об'єднуємо списки
         List<Apartment> allApartments = new ArrayList<>();
         allApartments.addAll(lvivApartments);
         allApartments.addAll(ivanoFrankivskApartments);
-        
         // Сортуємо за датою створення (найновіші спочатку)
         allApartments.sort((a1, a2) -> {
             if (a1.getCreatedAt() == null && a2.getCreatedAt() == null) return 0;
@@ -97,7 +94,10 @@ public class PostingService {
             if (a2.getCreatedAt() == null) return -1;
             return a2.getCreatedAt().compareTo(a1.getCreatedAt());
         });
-        
+        // Беремо лише 2 найновіших
+        if (allApartments.size() > 2) {
+            allApartments = allApartments.subList(0, 2);
+        }
         return postSmart(allApartments);
     }
     
