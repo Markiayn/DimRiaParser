@@ -102,28 +102,50 @@ public class TelegramService {
     }
     
     /**
+     * Обрізає caption до 1024 символів, залишаючи хвіст (адреса, ціна, поверх, кімнати, площа, телефон)
+     */
+    private String trimCaption(String description, String tail) {
+        final int MAX_LENGTH = 1024;
+        if ((description + tail).length() <= MAX_LENGTH) {
+            return description + tail;
+        }
+        int tailLen = tail.length();
+        int allowedDescLen = MAX_LENGTH - tailLen;
+        if (allowedDescLen <= 0) {
+            // Якщо хвіст сам по собі довший за ліміт, обрізаємо його
+            return tail.substring(tail.length() - MAX_LENGTH);
+        }
+        // Обрізаємо опис по останньому повному реченню
+        String desc = description.substring(0, Math.min(description.length(), allowedDescLen));
+        int lastDot = desc.lastIndexOf(".");
+        int lastExcl = desc.lastIndexOf("!");
+        int lastQuest = desc.lastIndexOf("?");
+        int lastSentence = Math.max(lastDot, Math.max(lastExcl, lastQuest));
+        if (lastSentence > 30) {
+            desc = desc.substring(0, lastSentence + 1);
+        }
+        return desc.trim() + "\n\n" + tail.trim();
+    }
+    
+    /**
      * Форматує повідомлення про квартиру (без посилання та дати)
      */
     private String formatApartmentMessage(Apartment apartment) {
-        StringBuilder message = new StringBuilder();
-        
-        message.append("🏠 *НОВА КВАРТИРА ДЛЯ ОРЕНДИ*\n\n");
-        
-        if (apartment.getDescription() != null && !apartment.getDescription().isEmpty()) {
-            message.append("📝 *Опис:* ").append(apartment.getDescription()).append("\n\n");
-        }
-        
-        message.append("📍 *Адреса:* ").append(apartment.getAddress()).append("\n");
-        message.append("💰 *Ціна:* ").append(formatPrice(apartment.getPrice())).append("\n");
-        message.append("🏢 *Поверх:* ").append(apartment.getFloor()).append("/").append(apartment.getFloorsCount()).append("\n");
-        message.append("🛏 *Кімнат:* ").append(apartment.getRooms()).append("\n");
-        message.append("📐 *Площа:* ").append(apartment.getArea()).append(" м²\n");
-        
+        StringBuilder tail = new StringBuilder();
+        tail.append("📍 *Адреса:* ").append(apartment.getAddress()).append("\n");
+        tail.append("💰 *Ціна:* ").append(formatPrice(apartment.getPrice())).append("\n");
+        tail.append("🏢 *Поверх:* ").append(apartment.getFloor()).append("/").append(apartment.getFloorsCount()).append("\n");
+        tail.append("🛏 *Кімнат:* ").append(apartment.getRooms()).append("\n");
+        tail.append("📐 *Площа:* ").append(apartment.getArea()).append(" м²\n");
         if (apartment.getPhone() != null && !apartment.getPhone().isEmpty()) {
-            message.append("📞 *Телефон:* `").append(apartment.getPhone()).append("`\n");
+            tail.append("📞 *Телефон:* `").append(apartment.getPhone()).append("`\n");
         }
-        
-        return message.toString();
+        StringBuilder description = new StringBuilder();
+        description.append("🏠 *НОВА КВАРТИРА ДЛЯ ОРЕНДИ*\n\n");
+        if (apartment.getDescription() != null && !apartment.getDescription().isEmpty()) {
+            description.append("📝 *Опис:* ").append(apartment.getDescription()).append("\n\n");
+        }
+        return trimCaption(description.toString(), tail.toString());
     }
     
     /**
