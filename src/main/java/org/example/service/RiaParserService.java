@@ -358,7 +358,7 @@ public class RiaParserService {
         ChromeOptions options = new ChromeOptions();
         options.addArguments("--disable-blink-features=AutomationControlled");
         options.addArguments("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/115.0.0.0 Safari/537.36");
-        options.addArguments("--headless=new");
+        // options.addArguments("--headless=new"); // Вимкнено headless режим для візуалізації браузера
         ChromeDriver driver = new ChromeDriver(options);
         driver.manage().timeouts().implicitlyWait(Duration.ofSeconds(5));
         return driver;

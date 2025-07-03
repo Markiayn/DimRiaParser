@@ -32,41 +32,27 @@ public class AutoPostingScheduler {
         }
         
         long delayTo8AM = calculateDelayToTime(8, 0);
-        long delayTo9AM = calculateDelayToTime(9, 0);
         long delayTo10AM = calculateDelayToTime(10, 0);
-        
         if (verbose) {
             System.out.println("Затримка до парсингу (8:00): " + formatDelay(delayTo8AM));
-            System.out.println("Затримка до ранкового постингу (9:00): " + formatDelay(delayTo9AM));
             System.out.println("Затримка до щогодинного постингу (10:00): " + formatDelay(delayTo10AM));
         }
-        
+        // Ранковий парсинг о 8:00
         scheduler.scheduleAtFixedRate(
             this::runMorningParsing,
             delayTo8AM,
             TimeUnit.DAYS.toSeconds(1),
             TimeUnit.SECONDS
         );
-        
-        scheduler.scheduleAtFixedRate(
-            this::runMorningPosting,
-            delayTo9AM,
-            TimeUnit.DAYS.toSeconds(1),
-            TimeUnit.SECONDS
-        );
-        
+        // Щогодинний постинг з 10:00
         scheduler.scheduleAtFixedRate(
             this::runHourlyPosting,
             delayTo10AM,
             TimeUnit.HOURS.toSeconds(1),
             TimeUnit.SECONDS
         );
-        
         System.out.println("Автоматичний постинг запущено!");
-        System.out.println("Розклад:");
-        System.out.println("   8:00 - Парсинг нових оголошень");
-        System.out.println("   9:00 - Постинг 2 найновіших оголошень (різні канали)");
-        System.out.println("   10:00-22:00 - Щогодинний постинг (нові або ранкові)");
+        System.out.println("Розклад: 8:00 - Парсинг нових оголошень; 10:00-22:00 - Щогодинний постинг (нові за останню годину)");
     }
     
     public void startScheduledPostingFromNow() {
@@ -80,11 +66,7 @@ public class AutoPostingScheduler {
         java.time.LocalTime now = java.time.LocalTime.now();
         System.out.println("Поточний час: " + now.format(java.time.format.DateTimeFormatter.ofPattern("HH:mm")));
         
-        System.out.println("Запуск негайного парсингу...");
-        scheduler.schedule(this::runMorningParsing, 0, TimeUnit.SECONDS);
-        
         long delayToNextHour = calculateDelayToNextHour();
-        
         if (verbose) {
             System.out.println("Затримка до першого постингу: " + formatDelay(delayToNextHour));
         }
@@ -96,31 +78,9 @@ public class AutoPostingScheduler {
             TimeUnit.SECONDS
         );
         
+        java.time.LocalTime nextHour = java.time.LocalTime.now().truncatedTo(java.time.temporal.ChronoUnit.HOURS).plusHours(1);
         System.out.println("Автоматичний постинг з поточного моменту запущено!");
-        System.out.println("Розклад:");
-        System.out.println("   Негайно - Парсинг нових оголошень");
-        System.out.println("   " + java.time.LocalTime.now().plusSeconds(delayToNextHour).format(java.time.format.DateTimeFormatter.ofPattern("HH:mm")) + " - Перший постинг");
-        System.out.println("   Далі щогодинно до 22:00");
-    }
-    
-    private void runMorningParsing() {
-        try {
-            System.out.println("\nПочинаємо ранковий парсинг (8:00) для всіх міст...");
-            parserService.parseApartmentsForAllCities();
-            System.out.println("Ранковий парсинг завершено!");
-        } catch (Exception e) {
-            System.err.println("Помилка ранкового парсингу: " + e.getMessage());
-        }
-    }
-    
-    private void runMorningPosting() {
-        try {
-            System.out.println("\nПочинаємо ранковий постинг (9:00) для всіх міст...");
-            postingService.postMorningApartmentsForAllCities(org.example.config.CityConfig.getCities());
-            System.out.println("Ранковий постинг завершено!");
-        } catch (Exception e) {
-            System.err.println("Помилка ранкового постингу: " + e.getMessage());
-        }
+        System.out.println("Розклад: " + nextHour.format(java.time.format.DateTimeFormatter.ofPattern("HH:mm")) + " - Перший постинг, далі щогодинно до 22:00");
     }
     
     private void runHourlyPosting() {
@@ -132,22 +92,27 @@ public class AutoPostingScheduler {
             return;
         }
         try {
-            System.out.println("\nПочинаємо щогодинний постинг (" + currentTime.getHour() + ":00) для всіх міст...");
-            for (org.example.config.CityConfig.City city : org.example.config.CityConfig.getCities()) {
-                postHourlyForCity(city);
-            }
+            // Спочатку постимо
+            System.out.println("Починаємо щогодинний постинг (" + currentTime.getHour() + ":00) для всіх міст...");
+            postingService.publishPostsForAllCitiesWithSmartLogic(2); // 2 пости на місто за останню годину
             System.out.println("Щогодинний постинг завершено!");
+            // Після постингу парсимо нові оголошення
+            System.out.println("Парсинг нових оголошень після постингу (" + currentTime.getHour() + ":00) для всіх міст...");
+            parserService.parseApartmentsForAllCities();
+            System.out.println("Парсинг завершено!");
         } catch (Exception e) {
             System.err.println("Помилка щогодинного постингу: " + e.getMessage());
         }
     }
     
-    private void postHourlyForCity(org.example.config.CityConfig.City city) {
-        if (verbose) {
-            System.out.println("Постинг для міста: " + city.name);
+    private void runMorningParsing() {
+        try {
+            System.out.println("\nПочинаємо ранковий парсинг (8:00) для всіх міст...");
+            parserService.parseApartmentsForAllCities();
+            System.out.println("Ранковий парсинг завершено!");
+        } catch (Exception e) {
+            System.err.println("Помилка ранкового парсингу: " + e.getMessage());
         }
-        
-        postingService.postMorningApartmentsForCity(city.dbTable, city.channel1, city.channel2);
     }
     
     private long calculateDelayToTime(int hour, int minute) {
@@ -167,13 +132,8 @@ public class AutoPostingScheduler {
     }
     
     private long calculateDelayToNextHour() {
-        LocalTime now = LocalTime.now();
-        LocalTime nextHour = LocalTime.of(now.getHour() + 1, 0, 0);
-        
-        if (nextHour.getHour() == 0) {
-            nextHour = LocalTime.of(0, 0, 0);
-        }
-        
+        java.time.LocalTime now = java.time.LocalTime.now();
+        java.time.LocalTime nextHour = now.truncatedTo(java.time.temporal.ChronoUnit.HOURS).plusHours(1);
         return java.time.Duration.between(now, nextHour).getSeconds();
     }
     
