@@ -125,7 +125,7 @@ public class AutoPostingScheduler {
     
     private void runHourlyPosting() {
         java.time.LocalTime currentTime = java.time.LocalTime.now();
-        if (currentTime.isBefore(java.time.LocalTime.of(10, 0)) || currentTime.isAfter(java.time.LocalTime.of(22, 0))) {
+        if (currentTime.getHour() < 10 || currentTime.getHour() > 22) {
             if (verbose) {
                 System.out.println("Щогодинний постинг пропущено (поза робочими часами 10:00-22:00)");
             }

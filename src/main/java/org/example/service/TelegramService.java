@@ -306,7 +306,11 @@ public class TelegramService {
         sb.append("НОВА КВАРТИРА ДЛЯ ОРЕНДИ\n\n");
         
         String importantInfo = String.format(
-            "Адреса: %s\nЦіна: %s\nПоверх: %d/%d\nКімнат: %d\nПлоща: %.1f м²",
+            "📍 Адреса: %s\n" +
+            "💵 Ціна: %s\n" +
+            "🏢 Поверх: %d/%d\n" +
+            "🛏 Кімнат: %d\n" +
+            "📐 Площа: %.1f м²",
             apartment.getAddress(),
             formatPrice(apartment.getPrice()),
             apartment.getFloor(),
@@ -316,7 +320,7 @@ public class TelegramService {
         );
         
         if (apartment.getPhone() != null && !apartment.getPhone().isEmpty()) {
-            importantInfo += "\nТелефон: " + apartment.getPhone();
+            importantInfo += "\n📞 Телефон: " + apartment.getPhone();
         }
         
         if (apartment.getDescription() != null && !apartment.getDescription().isEmpty()) {
@@ -346,7 +350,7 @@ public class TelegramService {
                     }
                 }
                 
-                sb.append("Опис: ").append(description).append("\n\n");
+                sb.append("📝 Опис: ").append(description).append("\n\n");
             }
         }
         

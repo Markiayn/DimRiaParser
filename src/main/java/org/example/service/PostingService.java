@@ -336,7 +336,7 @@ public class PostingService {
             System.out.println("🌅 Починаємо постинг ранкових оголошень для таблиці: " + tableName);
         }
         
-        // Використовуємо всі неопубліковані записи замість фільтра за часом
+        // Беремо лише 2 найновіших квартири
         List<Apartment> apartments = databaseManager.getUnpostedApartments(tableName, 2);
         
         if (apartments.isEmpty()) {
@@ -357,7 +357,9 @@ public class PostingService {
             logWarning("[WARN] Для таблиці " + tableName + " не вказано обидва канали. Канал1: '" + channel1 + "', Канал2: '" + channel2 + "'");
         }
         
-        boolean success = telegramService.sendDifferentApartmentsToChannelsCustomChannels(apt1, channel1, apt2, channel2);
+        boolean success = false;
+        if (apt1 != null) success |= telegramService.sendApartmentPost(apt1, channel1);
+        if (apt2 != null) success |= telegramService.sendApartmentPost(apt2, channel2);
         
         if (success) {
             if (apt1 != null) markAsPublished(apt1);
