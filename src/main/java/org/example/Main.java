@@ -103,6 +103,21 @@ public class Main {
                 }
                 break;
                 
+            case "autonow":
+                System.out.println("🤖 Запуск автоматичного режиму з поточного моменту...");
+                AutoPostingScheduler schedulerNow = new AutoPostingScheduler();
+                schedulerNow.startScheduledPostingFromNow();
+                
+                // Чекаємо сигнал для зупинки
+                Runtime.getRuntime().addShutdownHook(new Thread(schedulerNow::stop));
+                
+                try {
+                    Thread.sleep(Long.MAX_VALUE);
+                } catch (InterruptedException e) {
+                    schedulerNow.stop();
+                }
+                break;
+                
             case "test":
                 System.out.println("🧪 Запуск тестового постингу...");
                 AutoPostingScheduler testScheduler = new AutoPostingScheduler();
@@ -134,11 +149,12 @@ public class Main {
             System.out.println("\n📋 Виберіть опцію:");
             System.out.println("1. 🔄 Парсинг оголошень");
             System.out.println("2. 📤 Постинг оголошень");
-            System.out.println("3. 🤖 Автоматичний режим");
-            System.out.println("4. 🧪 Тестовий постинг");
-            System.out.println("5. 🧪 Повний тестовий режим");
-            System.out.println("6. 🧪 Тестовий цикл з кастомним таймінгом");
-            System.out.println("7. ❌ Вихід");
+            System.out.println("3. 🤖 Автоматичний режим (з 8:00)");
+            System.out.println("4. 🤖 Автоматичний режим (з поточного моменту)");
+            System.out.println("5. 🧪 Тестовий постинг");
+            System.out.println("6. 🧪 Повний тестовий режим");
+            System.out.println("7. 🧪 Тестовий цикл з кастомним таймінгом");
+            System.out.println("8. ❌ Вихід");
             System.out.print("Ваш вибір: ");
             
             String choice = scanner.nextLine().trim();
@@ -157,18 +173,22 @@ public class Main {
                     break;
                     
                 case "4":
-                    runTestPosting();
+                    runAutoModeFromNow();
                     break;
                     
                 case "5":
-                    runFullTestMode();
+                    runTestPosting();
                     break;
                     
                 case "6":
-                    runTestCycle();
+                    runFullTestMode();
                     break;
                     
                 case "7":
+                    runTestCycle();
+                    break;
+                    
+                case "8":
                     System.out.println("👋 До побачення!");
                     return;
                     
@@ -207,6 +227,22 @@ public class Main {
         
         AutoPostingScheduler scheduler = new AutoPostingScheduler();
         scheduler.startScheduledPosting();
+        
+        Runtime.getRuntime().addShutdownHook(new Thread(scheduler::stop));
+        
+        try {
+            Thread.sleep(Long.MAX_VALUE);
+        } catch (InterruptedException e) {
+            scheduler.stop();
+        }
+    }
+    
+    private static void runAutoModeFromNow() {
+        System.out.println("\n🤖 Запуск автоматичного режиму з поточного моменту...");
+        System.out.println("💡 Для зупинки натисніть Ctrl+C");
+        
+        AutoPostingScheduler scheduler = new AutoPostingScheduler();
+        scheduler.startScheduledPostingFromNow();
         
         Runtime.getRuntime().addShutdownHook(new Thread(scheduler::stop));
         
@@ -265,10 +301,11 @@ public class Main {
         System.out.println("\n📖 Використання:");
         System.out.println("  java -jar DimRiaParser.jar [команда]");
         System.out.println("\n📋 Доступні команди:");
-        System.out.println("  parse  - Парсинг оголошень");
-        System.out.println("  post   - Постинг оголошень");
-        System.out.println("  auto   - Автоматичний режим");
-        System.out.println("  test   - Тестовий постинг");
+        System.out.println("  parse   - Парсинг оголошень");
+        System.out.println("  post    - Постинг оголошень");
+        System.out.println("  auto    - Автоматичний режим (з 8:00)");
+        System.out.println("  autonow - Автоматичний режим (з поточного моменту)");
+        System.out.println("  test    - Тестовий постинг");
         System.out.println("  testfull - Повний тестовий режим");
         System.out.println("  testcycle - Тестовий цикл з кастомним таймінгом");
         System.out.println("\n💡 Без аргументів запускається інтерактивний режим");

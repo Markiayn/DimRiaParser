@@ -82,6 +82,50 @@ public class AutoPostingScheduler {
     }
     
     /**
+     * Запускає автоматичний постинг з поточного моменту:
+     * - Негайно парсинг для всіх міст
+     * - Через 1 годину перший постинг
+     * - Потім щогодинний постинг до 22:00
+     */
+    public void startScheduledPostingFromNow() {
+        System.out.println("🚀 Запуск автоматичного постингу з поточного моменту...");
+        
+        // Перевіряємо підключення до Telegram
+        if (!postingService.testTelegramConnection()) {
+            System.err.println("❌ Помилка підключення до Telegram. Перевірте налаштування.");
+            return;
+        }
+        
+        java.time.LocalTime now = java.time.LocalTime.now();
+        System.out.println("⏰ Поточний час: " + now.format(java.time.format.DateTimeFormatter.ofPattern("HH:mm")));
+        
+        // Негайно запускаємо парсинг
+        System.out.println("🔄 Запуск негайного парсингу...");
+        scheduler.schedule(this::runMorningParsing, 0, TimeUnit.SECONDS);
+        
+        // Розраховуємо затримку до наступної години для першого постингу
+        long delayToNextHour = calculateDelayToNextHour();
+        
+        if (verbose) {
+            System.out.println("⏰ Затримка до першого постингу: " + formatDelay(delayToNextHour));
+        }
+        
+        // Перший постинг через годину
+        scheduler.scheduleAtFixedRate(
+            this::runHourlyPosting,
+            delayToNextHour,
+            TimeUnit.HOURS.toSeconds(1), // Кожну годину
+            TimeUnit.SECONDS
+        );
+        
+        System.out.println("✅ Автоматичний постинг з поточного моменту запущено!");
+        System.out.println("📅 Розклад:");
+        System.out.println("   🕐 Негайно - Парсинг нових оголошень");
+        System.out.println("   🕐 " + java.time.LocalTime.now().plusSeconds(delayToNextHour).format(java.time.format.DateTimeFormatter.ofPattern("HH:mm")) + " - Перший постинг");
+        System.out.println("   🕐 Далі щогодинно до 22:00");
+    }
+    
+    /**
      * Ранковий парсинг о 8:00 для всіх міст
      */
     private void runMorningParsing() {
@@ -136,27 +180,9 @@ public class AutoPostingScheduler {
         if (verbose) {
             System.out.println("⏰ Постинг для міста: " + city.name);
         }
-        // Нові оголошення за останню годину
-        java.util.List<org.example.model.Apartment> recent = postingService.databaseManager.getUnpostedApartmentsFromLastHour(city.dbTable, 5);
-        if (recent != null && !recent.isEmpty()) {
-            if (verbose) {
-                System.out.println("🆕 Знайдено " + recent.size() + " нових оголошень за останню годину для " + city.name);
-            }
-            org.example.model.Apartment apt1 = recent.size() > 0 ? recent.get(0) : null;
-            org.example.model.Apartment apt2 = recent.size() > 1 ? recent.get(1) : null;
-            if ((city.channel1 == null || city.channel1.isEmpty()) || (city.channel2 == null || city.channel2.isEmpty())) {
-                postingService.logWarning("[WARN] Для міста " + city.name + " не вказано обидва канали. Канал1: '" + city.channel1 + "', Канал2: '" + city.channel2 + "'");
-            }
-            postingService.telegramService.sendDifferentApartmentsToChannelsCustomChannels(apt1, city.channel1, apt2, city.channel2);
-            if (apt1 != null) postingService.markAsPublished(apt1);
-            if (apt2 != null) postingService.markAsPublished(apt2);
-        } else {
-            // Якщо нових немає, беремо з ранкових
-            if (verbose) {
-                System.out.println("📅 Використовуємо ранкові оголошення (нових немає) для " + city.name);
-            }
-            postingService.postMorningApartmentsForCity(city.dbTable, city.channel1, city.channel2);
-        }
+        
+        // Використовуємо публічний метод PostingService для постингу
+        postingService.postMorningApartmentsForCity(city.dbTable, city.channel1, city.channel2);
     }
     
     /**
@@ -178,6 +204,21 @@ public class AutoPostingScheduler {
         }
         
         return delaySeconds;
+    }
+    
+    /**
+     * Розраховує затримку до наступної години (наприклад, якщо зараз 14:25, то до 15:00)
+     */
+    private long calculateDelayToNextHour() {
+        LocalTime now = LocalTime.now();
+        LocalTime nextHour = LocalTime.of(now.getHour() + 1, 0, 0);
+        
+        // Якщо зараз 23:xx, то наступна година буде 00:00 завтра
+        if (nextHour.getHour() == 0) {
+            nextHour = LocalTime.of(0, 0, 0);
+        }
+        
+        return java.time.Duration.between(now, nextHour).getSeconds();
     }
     
     /**
