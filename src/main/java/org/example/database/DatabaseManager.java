@@ -39,9 +39,9 @@ public class DatabaseManager {
         try (Connection conn = getConnection();
              Statement stmt = conn.createStatement()) {
             stmt.executeUpdate(sql);
-            System.out.println("✅ Таблицю " + tableName + " створено успішно");
+            System.out.println("Таблицю " + tableName + " створено успішно");
         } catch (SQLException e) {
-            System.err.println("❌ Помилка створення таблиці " + tableName + ": " + e.getMessage());
+            System.err.println("Помилка створення таблиці " + tableName + ": " + e.getMessage());
             throw new RuntimeException("Не вдалося створити таблицю", e);
         }
     }
@@ -75,13 +75,13 @@ public class DatabaseManager {
             
             int affected = pstmt.executeUpdate();
             if (affected > 0) {
-                System.out.println("✅ Квартиру з ID " + apartment.getId() + " додано до таблиці " + tableName);
+                System.out.println("Квартиру з ID " + apartment.getId() + " додано до таблиці " + tableName);
             } else {
-                System.out.println("⚠️ Квартира з ID " + apartment.getId() + " вже існує в таблиці " + tableName);
+                System.out.println("Квартира з ID " + apartment.getId() + " вже існує в таблиці " + tableName);
             }
             
         } catch (SQLException e) {
-            System.err.println("❌ Помилка вставки квартири: " + e.getMessage());
+            System.err.println("Помилка вставки квартири: " + e.getMessage());
             throw new RuntimeException("Не вдалося вставити квартиру", e);
         }
     }
@@ -107,9 +107,6 @@ public class DatabaseManager {
         return apartments;
     }
     
-    /**
-     * Отримує неопубліковані квартири з останньої години
-     */
     public List<Apartment> getUnpostedApartmentsFromLastHour(String tableName, int limit) {
         String sql = String.format(
             "SELECT * FROM %s WHERE Posted = 0 AND CreatedAt >= ? ORDER BY CreatedAt DESC LIMIT ?", 
@@ -120,7 +117,6 @@ public class DatabaseManager {
         try (Connection conn = getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
             
-            // Встановлюємо час - 1 година тому
             LocalDateTime oneHourAgo = LocalDateTime.now().minusHours(1);
             String oneHourAgoStr = oneHourAgo.format(formatter);
             
@@ -133,29 +129,20 @@ public class DatabaseManager {
             }
             
         } catch (SQLException e) {
-            System.err.println("❌ Помилка отримання квартир з останньої години: " + e.getMessage());
+            System.err.println("Помилка отримання квартир з останньої години: " + e.getMessage());
         }
         
         return apartments;
     }
     
-    /**
-     * Отримує неопубліковані квартири (без параметра tableName)
-     */
     public List<Apartment> getUnpostedApartments() {
         return getUnpostedApartments(AppConfig.getTableName(), 10);
     }
     
-    /**
-     * Отримує неопубліковані квартири з останньої години (без параметра tableName)
-     */
     public List<Apartment> getUnpostedApartmentsFromLastHour() {
         return getUnpostedApartmentsFromLastHour(AppConfig.getTableName(), 10);
     }
     
-    /**
-     * Отримує неопубліковані квартири з останніх 24 годин
-     */
     public List<Apartment> getUnpostedApartmentsFromLast24Hours(String tableName, int limit) {
         String sql = String.format(
             "SELECT * FROM %s WHERE Posted = 0 AND CreatedAt >= ? ORDER BY CreatedAt DESC LIMIT ?",
@@ -164,7 +151,6 @@ public class DatabaseManager {
         List<Apartment> apartments = new ArrayList<>();
         try (Connection conn = getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            // Встановлюємо час - 24 години тому
             LocalDateTime dayAgo = LocalDateTime.now().minusHours(24);
             String dayAgoStr = dayAgo.format(formatter);
             
@@ -176,14 +162,11 @@ public class DatabaseManager {
             }
             
         } catch (SQLException e) {
-            System.err.println("❌ Помилка отримання квартир з останніх 24 годин: " + e.getMessage());
+            System.err.println("Помилка отримання квартир з останніх 24 годин: " + e.getMessage());
         }
         return apartments;
     }
     
-    /**
-     * Позначає квартиру як опубліковану (без параметра tableName)
-     */
     public void markApartmentAsPublished(int id) {
         markAsPosted(AppConfig.getTableName(), id);
     }

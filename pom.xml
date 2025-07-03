@@ -11,14 +11,12 @@
     <version>1.0-SNAPSHOT</version>
 
     <dependencies>
-        <!-- Jsoup для HTTP-запитів -->
         <dependency>
             <groupId>org.jsoup</groupId>
             <artifactId>jsoup</artifactId>
             <version>1.17.2</version>
         </dependency>
 
-        <!-- JSON (org.json) -->
         <dependency>
             <groupId>org.json</groupId>
             <artifactId>json</artifactId>

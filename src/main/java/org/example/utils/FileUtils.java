@@ -14,18 +14,18 @@ public class FileUtils {
         File folder = new File(folderPath);
         
         if (!folder.exists()) {
-            System.out.println("📁 Папка " + folderPath + " не існує.");
+            System.out.println("Папка " + folderPath + " не існує.");
             return;
         }
 
         if (!folder.isDirectory()) {
-            System.out.println("❌ " + folderPath + " не є папкою.");
+            System.out.println(folderPath + " не є папкою.");
             return;
         }
 
         File[] files = folder.listFiles();
         if (files == null || files.length == 0) {
-            System.out.println("📂 Папка порожня.");
+            System.out.println("Папка порожня.");
             return;
         }
 
@@ -38,14 +38,14 @@ public class FileUtils {
                     deletedCount++;
                 } else {
                     failedCount++;
-                    System.out.println("❌ Не вдалося видалити: " + file.getName());
+                    System.out.println("Не вдалося видалити: " + file.getName());
                 }
             }
         }
 
-        System.out.println("🧹 Видалено " + deletedCount + " файлів з папки: " + folderPath);
+        System.out.println("Видалено " + deletedCount + " файлів з папки: " + folderPath);
         if (failedCount > 0) {
-            System.out.println("⚠️ Не вдалося видалити " + failedCount + " файлів");
+            System.out.println("Не вдалося видалити " + failedCount + " файлів");
         }
     }
 
@@ -57,10 +57,10 @@ public class FileUtils {
             Path path = Paths.get(directoryPath);
             if (!Files.exists(path)) {
                 Files.createDirectories(path);
-                System.out.println("📁 Створено папку: " + directoryPath);
+                System.out.println("Створено папку: " + directoryPath);
             }
         } catch (IOException e) {
-            System.err.println("❌ Помилка створення папки " + directoryPath + ": " + e.getMessage());
+            System.err.println("Помилка створення папки " + directoryPath + ": " + e.getMessage());
         }
     }
 
@@ -87,7 +87,7 @@ public class FileUtils {
                         .sum();
             }
         } catch (IOException e) {
-            System.err.println("❌ Помилка обчислення розміру папки: " + e.getMessage());
+            System.err.println("Помилка обчислення розміру папки: " + e.getMessage());
             return 0;
         }
     }
@@ -116,7 +116,7 @@ public class FileUtils {
                 return (int) paths.filter(Files::isRegularFile).count();
             }
         } catch (IOException e) {
-            System.err.println("❌ Помилка підрахунку файлів: " + e.getMessage());
+            System.err.println("Помилка підрахунку файлів: " + e.getMessage());
             return 0;
         }
     }
@@ -133,7 +133,7 @@ public class FileUtils {
             }
             return false;
         } catch (IOException e) {
-            System.err.println("❌ Помилка видалення файлу " + filePath + ": " + e.getMessage());
+            System.err.println("Помилка видалення файлу " + filePath + ": " + e.getMessage());
             return false;
         }
     }

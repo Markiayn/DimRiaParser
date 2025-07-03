@@ -11,7 +11,6 @@ public class AppConfig {
         try {
             properties.load(new FileInputStream("config.properties"));
         } catch (IOException e) {
-            // Використовуємо значення за замовчуванням
             setDefaultProperties();
         }
     }

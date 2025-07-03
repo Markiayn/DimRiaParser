@@ -170,103 +170,43 @@ public class PostingService {
             }
         }
         
-        // Якщо не знайдено, повертаємо за замовчуванням
         return "Apartments_Lviv";
     }
     
-    /**
-     * Тестує підключення до Telegram
-     */
     public boolean testTelegramConnection() {
         return telegramService.testConnection();
     }
     
-    /**
-     * Відправляє тестове повідомлення
-     */
-    public boolean sendTestMessage() {
-        Apartment testApartment = new Apartment();
-        testApartment.setId(999999);
-        testApartment.setDescription("Тестове оголошення");
-        testApartment.setAddress("Тестова адреса");
-        testApartment.setPrice(10000);
-        testApartment.setFloor(5);
-        testApartment.setFloorsCount(9);
-        testApartment.setRooms(2);
-        testApartment.setArea(50);
-        testApartment.setPhone("+380991234567");
-        
-        return telegramService.sendToBothChannels(testApartment);
-    }
-    
-    /**
-     * Тестовий режим: парсинг + постинг
-     */
-    public boolean runTestMode() {
-        System.out.println("🧪 Запуск тестового режиму (парсинг + постинг)...");
-        
-        try {
-            // 1. Тестовий парсинг
-            System.out.println("🔄 Крок 1: Тестовий парсинг...");
-            RiaParserService parser = new RiaParserService();
-            parser.parseTestApartments();
-            
-            // 2. Тестовий постинг
-            System.out.println("📤 Крок 2: Тестовий постинг...");
-            boolean success = postMorningApartments();
-            
-            if (success) {
-                System.out.println("✅ Тестовий режим завершено успішно!");
-                return true;
-            } else {
-                System.out.println("⚠️ Тестовий режим завершено, але постинг не вдався");
-                return false;
-            }
-            
-        } catch (Exception e) {
-            System.err.println("❌ Помилка в тестовому режимі: " + e.getMessage());
-            return false;
-        }
-    }
-    
-    /**
-     * Публікує пости для вказаного міста
-     */
     public void publishPostsForCity(String tableName, int postsCount) {
-        System.out.println("\n📤 Публікація постів для " + tableName + "...");
+        System.out.println("\nПублікація постів для " + tableName + "...");
         
-        // Отримуємо неопубліковані квартири
         List<Apartment> unpostedApartments = databaseManager.getUnpostedApartments(tableName, postsCount);
         
         if (unpostedApartments.isEmpty()) {
-            System.out.println("⚠️ Немає неопублікованих квартир для " + tableName);
+            System.out.println("Немає неопублікованих квартир для " + tableName);
             return;
         }
         
         int publishedCount = 0;
         
         for (Apartment apartment : unpostedApartments) {
-            // Перевіряємо чи є фотографії
             if (apartment.getPhotoPaths() == null || apartment.getPhotoPaths().isEmpty()) {
                 if (verbose) {
-                    System.out.println("⚠️ Квартира " + apartment.getId() + " без фотографій - пропускаємо");
+                    System.out.println("Квартира " + apartment.getId() + " без фотографій - пропускаємо");
                 }
                 continue;
             }
             
-            // Відправляємо в обидва канали
             boolean success = telegramService.sendToBothChannels(apartment);
             
             if (success) {
-                // Позначаємо як опубліковану
                 databaseManager.markAsPosted(tableName, apartment.getId());
                 publishedCount++;
                 
                 if (verbose) {
-                    System.out.println("✅ Опубліковано квартиру " + apartment.getId() + " в " + tableName);
+                    System.out.println("Опубліковано квартиру " + apartment.getId() + " в " + tableName);
                 }
                 
-                // Затримка між постами
                 try {
                     Thread.sleep(2000);
                 } catch (InterruptedException e) {
@@ -274,82 +214,64 @@ public class PostingService {
                     break;
                 }
             } else {
-                System.err.println("❌ Не вдалося опублікувати квартиру " + apartment.getId());
+                System.err.println("Не вдалося опублікувати квартиру " + apartment.getId());
             }
         }
         
-        System.out.println("📊 Опубліковано " + publishedCount + " з " + unpostedApartments.size() + " квартир для " + tableName);
+        System.out.println("Опубліковано " + publishedCount + " з " + unpostedApartments.size() + " квартир для " + tableName);
     }
     
-    /**
-     * Публікує пости для всіх міст з розумною логікою
-     * Спочатку шукає нові пости (остання година), якщо нема - беремо зранку
-     */
     public void publishPostsForAllCitiesWithSmartLogic(int postsPerCity) {
-        System.out.println("🌍 Публікація постів для всіх міст з розумною логікою...");
+        System.out.println("Публікація постів для всіх міст з розумною логікою...");
         
-        // Отримуємо список всіх міст
         List<org.example.config.CityConfig.City> cities = org.example.config.CityConfig.getCities();
         
-        // Публікуємо для кожного міста
         for (org.example.config.CityConfig.City city : cities) {
             publishPostsForCityWithSmartLogic(city.dbTable, postsPerCity);
         }
     }
     
-    /**
-     * Публікує пости для вказаного міста з розумною логікою
-     */
     public void publishPostsForCityWithSmartLogic(String tableName, int postsCount) {
-        System.out.println("\n📤 Публікація постів для " + tableName + " з розумною логікою...");
+        System.out.println("\nПублікація постів для " + tableName + " з розумною логікою...");
         
-        // Спочатку шукаємо нові пости (остання година)
         List<Apartment> newApartments = databaseManager.getUnpostedApartmentsFromLastHour(tableName, postsCount);
         
         if (!newApartments.isEmpty()) {
-            System.out.println("🆕 Знайдено " + newApartments.size() + " нових квартир (остання година)");
+            System.out.println("Знайдено " + newApartments.size() + " нових квартир (остання година)");
             publishApartmentsList(tableName, newApartments);
         } else {
-            // Якщо нових немає, беремо всі неопубліковані (без фільтра за часом)
-            System.out.println("📅 Нових квартир немає, беремо всі неопубліковані");
+            System.out.println("Нових квартир немає, беремо всі неопубліковані");
             List<Apartment> allUnpostedApartments = databaseManager.getUnpostedApartments(tableName, postsCount);
             
             if (!allUnpostedApartments.isEmpty()) {
                 publishApartmentsList(tableName, allUnpostedApartments);
             } else {
-                System.out.println("⚠️ Немає неопублікованих квартир для " + tableName);
+                System.out.println("Немає неопублікованих квартир для " + tableName);
             }
         }
     }
     
-    /**
-     * Публікує список квартир
-     */
     private void publishApartmentsList(String tableName, List<Apartment> apartments) {
         int publishedCount = 0;
         
         for (Apartment apartment : apartments) {
-            // Перевіряємо чи є фотографії
             if (apartment.getPhotoPaths() == null || apartment.getPhotoPaths().isEmpty()) {
                 if (verbose) {
-                    System.out.println("⚠️ Квартира " + apartment.getId() + " без фотографій - пропускаємо");
+                    System.out.println("Квартира " + apartment.getId() + " без фотографій - пропускаємо");
                 }
                 continue;
             }
             
-            // Відправляємо в обидва канали
             boolean success = telegramService.sendToBothChannels(apartment);
             
             if (success) {
-                // Позначаємо як опубліковану
                 databaseManager.markAsPosted(tableName, apartment.getId());
                 publishedCount++;
                 
                 if (verbose) {
-                    System.out.println("✅ Опубліковано квартиру " + apartment.getId() + " в " + tableName);
+                    System.out.println("Опубліковано квартиру " + apartment.getId() + " в " + tableName);
                 }
                 
-                // Затримка між постами
                 try {
                     Thread.sleep(2000);
                 } catch (InterruptedException e) {
@@ -357,16 +279,12 @@ public class PostingService {
                     break;
                 }
             } else {
-                System.err.println("❌ Не вдалося опублікувати квартиру " + apartment.getId());
+                System.err.println("Не вдалося опублікувати квартиру " + apartment.getId());
             }
         }
         
-        System.out.println("📊 Опубліковано " + publishedCount + " з " + apartments.size() + " квартир для " + tableName);
+        System.out.println("Опубліковано " + publishedCount + " з " + apartments.size() + " квартир для " + tableName);
     }
-    
-    /**
-     * Публікує пости для всіх міст
-     */
     public void publishPostsForAllCities(int postsPerCity) {
         System.out.println("🌍 Публікація постів для всіх міст...");
         
@@ -461,10 +379,11 @@ public class PostingService {
      * Логування попереджень у файл warnings.log
      */
     public void logWarning(String message) {
+        System.out.println(message);
         try (java.io.FileWriter fw = new java.io.FileWriter("warnings.log", true)) {
             fw.write(java.time.LocalDateTime.now() + " " + message + "\n");
         } catch (Exception e) {
-            System.err.println("[WARN] Не вдалося записати у warnings.log: " + e.getMessage());
+            System.err.println("[LOG] Не вдалося записати у warnings.log: " + e.getMessage());
         }
     }
 } 

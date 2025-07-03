@@ -37,24 +37,19 @@ public class RiaParserService {
         this.verbose = AppConfig.isVerbose();
     }
     
-    /**
-     * Парсить квартири для всіх міст із конфігурації
-     */
     public void parseApartmentsForAllCities() {
-        // Очищаємо старі фотографії
         org.example.utils.FileUtils.deleteAllPhotos(photosDirectory);
 
         for (org.example.config.CityConfig.City city : org.example.config.CityConfig.getCities()) {
-            // Очищаємо таблицю міста перед парсингом
             databaseManager.clearTable(city.dbTable);
-            System.out.println("🏙 Парсинг міста: " + city.name + " (cityId=" + city.cityId + ", таблиця: " + city.dbTable + ", годин: " + city.hours + ")");
+            System.out.println("Парсинг міста: " + city.name + " (cityId=" + city.cityId + ", таблиця: " + city.dbTable + ", годин: " + city.hours + ")");
             parseApartments(
                 city.dbTable,
-                city.cityId, // regionId
-                null,        // cityId (якщо треба окремо, можна додати в config)
-                2,           // тип нерухомості (квартира)
-                3,           // тип операції (оренда)
-                city.hours,  // години для парсингу
+                city.cityId,
+                null,
+                2,
+                3,
+                city.hours,
                 AppConfig.getMaxPages(),
                 AppConfig.getMinRooms(),
                 AppConfig.getMinArea(),
@@ -63,56 +58,14 @@ public class RiaParserService {
         }
     }
     
-    /**
-     * Тестовий парсинг - по 5 записів з кожного міста
-     */
-    public void parseTestApartments() {
-        System.out.println("🧪 Запуск тестового парсингу (по 5 записів з кожного міста)...");
-        
-        // Очищаємо старі фотографії
-        org.example.utils.FileUtils.deleteAllPhotos(photosDirectory);
-        
-        // Парсимо Львівську область (тестовий режим)
-        // System.out.println("🏙 Тестовий парсинг Львівської області...");
-        // parseApartments(
-        //     "Apartments_Lviv",
-        //     5,        // область (Львівська)
-        //     null,     // місто
-        //     2,        // тип нерухомості (квартира)
-        //     3,        // тип операції (оренда)
-        //     48,       // години (більший діапазон для тесту)
-        //     1,        // тільки 1 сторінка
-        //     AppConfig.getMinRooms(),
-        //     AppConfig.getMinArea(),
-        //     3         // максимум 3 фото для тесту
-        // );
-        
-        // // Парсимо Івано-Франківську область (тестовий режим)
-        // System.out.println("🏙 Тестовий парсинг Івано-Франківської області...");
-        // parseApartments(
-        //     "Apartments_IvanoFrankivsk",
-        //     15,       // область (Івано-Франківська)
-        //     null,     // місто
-        //     2,        // тип нерухомості (квартира)
-        //     3,        // тип операції (оренда)
-        //     48,       // години (більший діапазон для тесту)
-        //     1,        // тільки 1 сторінка
-        //     AppConfig.getMinRooms(),
-        //     AppConfig.getMinArea(),
-        //     3         // максимум 3 фото для тесту
-        // );
-        
-        System.out.println("✅ Тестовий парсинг завершено!");
-    }
+
     
     public void parseApartments(String tableName, int regionId, Integer cityId, 
                                int realtyType, int operationType, int hoursLimit, 
                                int maxPages, int minRooms, double minArea, int maxPhotos) {
         
-        // Створюємо таблицю якщо не існує
         databaseManager.createTable(tableName);
         
-        // Налаштовуємо Chrome Driver
         System.setProperty("webdriver.chrome.driver", AppConfig.getChromeDriverPath());
         
         ChromeDriver driver = null;
@@ -122,24 +75,22 @@ public class RiaParserService {
             String[] hashHolder = setupHashListener(devTools);
             String[] phoneHolder = new String[1];
             
-            // Налаштовуємо перехоплення фотографій
             setupPhotoInterceptor(devTools);
             
             ParserStats stats = new ParserStats();
             
-            // Парсимо сторінки
             for (int page = 0; page < maxPages; page++) {
                 if (!parsePage(tableName, page, regionId, cityId, realtyType, operationType, 
                              hoursLimit, minRooms, minArea, maxPhotos, driver, formatter, 
                              hashHolder, phoneHolder, stats)) {
-                    break; // Якщо немає більше даних, виходимо
+                    break;
                 }
             }
             
             stats.printSummary(hoursLimit);
             
         } catch (Exception e) {
-            System.err.println("❌ Критична помилка при парсингу: " + e.getMessage());
+            System.err.println("Критична помилка при парсингу: " + e.getMessage());
             e.printStackTrace();
         } finally {
             if (driver != null) {
@@ -158,7 +109,7 @@ public class RiaParserService {
             String url = buildSearchUrl(page, regionId, cityId, realtyType, operationType);
             
             if (verbose) {
-                System.out.println("\n📄 Сторінка " + page + ": " + url);
+                System.out.println("\nСторінка " + page + ": " + url);
             }
             
             Connection.Response response = Jsoup.connect(url)
@@ -170,7 +121,7 @@ public class RiaParserService {
             JSONArray items = searchResult.optJSONArray("items");
             
             if (items == null || items.isEmpty()) {
-                if (verbose) System.out.println("📄 Більше оголошень немає");
+                if (verbose) System.out.println("Більше оголошень немає");
                 return false;
             }
             
@@ -187,7 +138,7 @@ public class RiaParserService {
             return true;
             
         } catch (Exception e) {
-            System.err.println("❌ Помилка при парсингу сторінки " + page + ": " + e.getMessage());
+            System.err.println("Помилка при парсингу сторінки " + page + ": " + e.getMessage());
             return false;
         }
     }
@@ -407,6 +358,7 @@ public class RiaParserService {
         ChromeOptions options = new ChromeOptions();
         options.addArguments("--disable-blink-features=AutomationControlled");
         options.addArguments("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/115.0.0.0 Safari/537.36");
+        options.addArguments("--headless=new");
         ChromeDriver driver = new ChromeDriver(options);
         driver.manage().timeouts().implicitlyWait(Duration.ofSeconds(5));
         return driver;
