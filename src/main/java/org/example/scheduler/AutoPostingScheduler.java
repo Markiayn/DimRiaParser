@@ -82,12 +82,12 @@ public class AutoPostingScheduler {
     }
     
     /**
-     * Ранковий парсинг о 8:00
+     * Ранковий парсинг о 8:00 для всіх міст
      */
     private void runMorningParsing() {
         try {
-            System.out.println("\n🌅 Починаємо ранковий парсинг (8:00)...");
-            parserService.parseApartments();
+            System.out.println("\n🌅 Починаємо ранковий парсинг (8:00) для всіх міст...");
+            parserService.parseApartmentsForAllCities();
             System.out.println("✅ Ранковий парсинг завершено!");
         } catch (Exception e) {
             System.err.println("❌ Помилка ранкового парсингу: " + e.getMessage());
@@ -95,48 +95,67 @@ public class AutoPostingScheduler {
     }
     
     /**
-     * Ранковий постинг о 9:00 (2 найновіші оголошення)
+     * Ранковий постинг о 9:00 (2 найновіші оголошення для кожного міста)
      */
     private void runMorningPosting() {
         try {
-            System.out.println("\n🌅 Починаємо ранковий постинг (9:00)...");
-            boolean success = postingService.postMorningApartments();
-            
-            if (success) {
-                System.out.println("✅ Ранковий постинг завершено!");
-            } else {
-                System.out.println("⚠️ Ранковий постинг не вдався - немає оголошень");
-            }
+            System.out.println("\n🌅 Починаємо ранковий постинг (9:00) для всіх міст...");
+            postingService.postMorningApartmentsForAllCities(org.example.config.CityConfig.getCities());
+            System.out.println("✅ Ранковий постинг завершено!");
         } catch (Exception e) {
             System.err.println("❌ Помилка ранкового постингу: " + e.getMessage());
         }
     }
     
     /**
-     * Щогодинний постинг з 10:00 до 22:00
+     * Щогодинний постинг з 10:00 до 22:00 для всіх міст
      */
     private void runHourlyPosting() {
-        LocalTime currentTime = LocalTime.now();
-        
-        // Перевіряємо чи поточний час в межах 10:00-22:00
-        if (currentTime.isBefore(LocalTime.of(10, 0)) || currentTime.isAfter(LocalTime.of(22, 0))) {
+        java.time.LocalTime currentTime = java.time.LocalTime.now();
+        if (currentTime.isBefore(java.time.LocalTime.of(10, 0)) || currentTime.isAfter(java.time.LocalTime.of(22, 0))) {
             if (verbose) {
-                System.out.println("⏰ Щогодинний постинг пропущено (поза робочими годинами 10:00-22:00)");
+                System.out.println("⏰ Щогодинний постинг пропущено (поза робочими часами 10:00-22:00)");
             }
             return;
         }
-        
         try {
-            System.out.println("\n⏰ Починаємо щогодинний постинг (" + currentTime.getHour() + ":00)...");
-            boolean success = postingService.postHourlyApartments();
-            
-            if (success) {
-                System.out.println("✅ Щогодинний постинг завершено!");
-            } else {
-                System.out.println("⚠️ Щогодинний постинг не вдався - немає оголошень");
+            System.out.println("\n⏰ Починаємо щогодинний постинг (" + currentTime.getHour() + ":00) для всіх міст...");
+            for (org.example.config.CityConfig.City city : org.example.config.CityConfig.getCities()) {
+                postHourlyForCity(city);
             }
+            System.out.println("✅ Щогодинний постинг завершено!");
         } catch (Exception e) {
             System.err.println("❌ Помилка щогодинного постингу: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Щогодинний постинг для одного міста
+     */
+    private void postHourlyForCity(org.example.config.CityConfig.City city) {
+        if (verbose) {
+            System.out.println("⏰ Постинг для міста: " + city.name);
+        }
+        // Нові оголошення за останню годину
+        java.util.List<org.example.model.Apartment> recent = postingService.databaseManager.getUnpostedApartmentsFromLastHour(city.dbTable, 5);
+        if (recent != null && !recent.isEmpty()) {
+            if (verbose) {
+                System.out.println("🆕 Знайдено " + recent.size() + " нових оголошень за останню годину для " + city.name);
+            }
+            org.example.model.Apartment apt1 = recent.size() > 0 ? recent.get(0) : null;
+            org.example.model.Apartment apt2 = recent.size() > 1 ? recent.get(1) : null;
+            if ((city.channel1 == null || city.channel1.isEmpty()) || (city.channel2 == null || city.channel2.isEmpty())) {
+                postingService.logWarning("[WARN] Для міста " + city.name + " не вказано обидва канали. Канал1: '" + city.channel1 + "', Канал2: '" + city.channel2 + "'");
+            }
+            postingService.telegramService.sendDifferentApartmentsToChannelsCustomChannels(apt1, city.channel1, apt2, city.channel2);
+            if (apt1 != null) postingService.markAsPublished(apt1);
+            if (apt2 != null) postingService.markAsPublished(apt2);
+        } else {
+            // Якщо нових немає, беремо з ранкових
+            if (verbose) {
+                System.out.println("📅 Використовуємо ранкові оголошення (нових немає) для " + city.name);
+            }
+            postingService.postMorningApartmentsForCity(city.dbTable, city.channel1, city.channel2);
         }
     }
     

@@ -42,51 +42,48 @@ public class TelegramService {
     }
     
     /**
-     * Відправляє пост про квартиру в Telegram з фото в повідомленні
+     * Відправляє різні квартири в різні кастомні канали
+     */
+    public boolean sendDifferentApartmentsToChannelsCustomChannels(Apartment apartment1, String channel1, Apartment apartment2, String channel2) {
+        boolean success1 = false;
+        boolean success2 = false;
+        if (apartment1 != null && channel1 != null && !channel1.isEmpty()) {
+            success1 = sendApartmentPost(apartment1, channel1);
+        }
+        if (apartment2 != null && channel2 != null && !channel2.isEmpty()) {
+            success2 = sendApartmentPost(apartment2, channel2);
+        }
+        return success1 || success2;
+    }
+    
+    /**
+     * Відправляє пост про квартиру в Telegram (plain text, без Markdown)
      */
     public boolean sendApartmentPost(Apartment apartment, String chatId) {
         try {
-            String message = formatApartmentMessage(apartment);
-            List<String> photos = apartment.getPhotoPaths();
-            
-            if (photos != null && !photos.isEmpty()) {
-                // Відправляємо повідомлення з усіма фото
-                boolean success = sendMessageWithAllPhotos(chatId, message, photos, apartment.getId());
-                
-                if (success) {
-                    // Підраховуємо реальну кількість існуючих фото
-                    int existingPhotos = 0;
-                    for (String photoPath : photos) {
-                        if (new File(photoPath).exists()) {
-                            existingPhotos++;
-                        }
-                    }
-                    
-                    if (verbose) {
-                        if (existingPhotos > 0) {
-                            System.out.println("✅ Пост з " + existingPhotos + " фото відправлено в чат " + chatId + " для квартири " + apartment.getId());
-                        } else {
-                            System.out.println("✅ Пост без фото відправлено в чат " + chatId + " для квартири " + apartment.getId());
-                        }
-                    }
-                }
-                
-                return success;
-            } else {
-                // Якщо фото немає, відправляємо тільки текст
-                String textResponse = sendMessage(chatId, message);
-                if (textResponse != null) {
-                    if (verbose) {
-                        System.out.println("✅ Пост без фото відправлено в чат " + chatId + " для квартири " + apartment.getId());
-                    }
-                    return true;
-                }
+            String message = formatApartmentMessagePlain(apartment);
+            java.util.List<String> photos = apartment.getPhotoPaths();
+
+            if (photos == null || photos.isEmpty()) {
+                return false;
+            }
+            if (chatId == null || chatId.isEmpty()) {
+                return false;
             }
             
-            return false;
+            // Перевіряємо довжину повідомлення і логуємо якщо воно обрізане
+            if (message.length() > 1024) {
+                logWarn("[TELEGRAM] Повідомлення для квартири " + apartment.getId() + " було обрізано з " + message.length() + " до 1024 символів");
+            }
             
+            if (photos.size() == 1) {
+                return sendMessageWithPhoto(chatId, message, photos.get(0), apartment.getId());
+            } else if (photos.size() > 1) {
+                return sendMediaGroup(chatId, message, photos, apartment.getId());
+            }
+            return false;
         } catch (Exception e) {
-            System.err.println("❌ Помилка відправки поста в Telegram: " + e.getMessage());
+            logWarn("[TELEGRAM] Помилка відправки квартири " + apartment.getId() + ": " + e.getMessage());
             return false;
         }
     }
@@ -165,26 +162,21 @@ public class TelegramService {
     private String sendMessage(String chatId, String text) {
         try {
             String url = String.format("https://api.telegram.org/bot%s/sendMessage", botToken);
-            
-            JSONObject requestBody = new JSONObject();
+            org.json.JSONObject requestBody = new org.json.JSONObject();
             requestBody.put("chat_id", chatId);
             requestBody.put("text", text);
-            requestBody.put("parse_mode", "Markdown");
             requestBody.put("disable_web_page_preview", true);
-            
-            String response = Jsoup.connect(url)
+            String response = org.jsoup.Jsoup.connect(url)
                     .ignoreContentType(true)
                     .requestBody(requestBody.toString())
                     .header("Content-Type", "application/json")
                     .post()
                     .body()
                     .text();
-            
-            JSONObject responseJson = new JSONObject(response);
+            org.json.JSONObject responseJson = new org.json.JSONObject(response);
             return responseJson.getBoolean("ok") ? response : null;
-            
         } catch (Exception e) {
-            System.err.println("❌ Помилка відправки повідомлення: " + e.getMessage());
+            logWarn("[MESSAGE] Помилка відправки повідомлення: " + e.getMessage());
             return null;
         }
     }
@@ -194,33 +186,80 @@ public class TelegramService {
      */
     private boolean sendMessageWithPhoto(String chatId, String message, String photoPath, int apartmentId) {
         try {
-            File photoFile = new File(photoPath);
+            java.io.File photoFile = new java.io.File(photoPath);
             if (!photoFile.exists()) {
-                if (verbose) {
-                    System.out.println("⚠️ Файл фото не знайдено: " + photoPath);
-                }
                 return false;
             }
             
             String url = String.format("https://api.telegram.org/bot%s/sendPhoto", botToken);
+            String boundary = "*****" + System.currentTimeMillis() + "*****";
             
-            String response = Jsoup.connect(url)
-                    .ignoreContentType(true)
-                    .data("chat_id", chatId)
-                    .data("caption", message)
-                    .data("parse_mode", "Markdown")
-                    .data("photo", photoFile.getName(), new java.io.FileInputStream(photoFile), "image/webp")
-                    .post()
-                    .body()
-                    .text();
+            java.net.URL urlObj = new java.net.URL(url);
+            java.net.HttpURLConnection connection = (java.net.HttpURLConnection) urlObj.openConnection();
+            connection.setRequestMethod("POST");
+            connection.setDoOutput(true);
+            connection.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + boundary);
             
-            JSONObject responseJson = new JSONObject(response);
-            return responseJson.getBoolean("ok");
+            try (java.io.OutputStream outputStream = connection.getOutputStream();
+                 java.io.PrintWriter writer = new java.io.PrintWriter(new java.io.OutputStreamWriter(outputStream, "UTF-8"), true)) {
+                
+                // Додаємо chat_id
+                writer.append("--").append(boundary).append("\r\n");
+                writer.append("Content-Disposition: form-data; name=\"chat_id\"").append("\r\n");
+                writer.append("\r\n");
+                writer.append(chatId).append("\r\n");
+                
+                // Додаємо caption
+                if (message != null && !message.isEmpty()) {
+                    writer.append("--").append(boundary).append("\r\n");
+                    writer.append("Content-Disposition: form-data; name=\"caption\"").append("\r\n");
+                    writer.append("\r\n");
+                    writer.append(message).append("\r\n");
+                }
+                
+                // Додаємо фото
+                writer.append("--").append(boundary).append("\r\n");
+                writer.append("Content-Disposition: form-data; name=\"photo\"; filename=\"").append(photoFile.getName()).append("\"").append("\r\n");
+                writer.append("Content-Type: image/webp").append("\r\n");
+                writer.append("\r\n");
+                writer.flush();
+                
+                try (java.io.FileInputStream inputStream = new java.io.FileInputStream(photoFile)) {
+                    byte[] buffer = new byte[4096];
+                    int bytesRead;
+                    while ((bytesRead = inputStream.read(buffer)) != -1) {
+                        outputStream.write(buffer, 0, bytesRead);
+                    }
+                    outputStream.flush();
+                }
+                
+                writer.append("\r\n");
+                writer.append("--").append(boundary).append("--").append("\r\n");
+                writer.flush();
+            }
+            
+            int responseCode = connection.getResponseCode();
+            java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(
+                responseCode >= 400 ? connection.getErrorStream() : connection.getInputStream()));
+            StringBuilder response = new StringBuilder();
+            String line;
+            while ((line = reader.readLine()) != null) {
+                response.append(line);
+            }
+            reader.close();
+            
+            if (responseCode == 200) {
+                org.json.JSONObject responseJson = new org.json.JSONObject(response.toString());
+                return responseJson.optBoolean("ok", false);
+            } else {
+                // Логуємо помилку відправки
+                String errorResponse = response.toString();
+                logWarn("[TELEGRAM] Помилка відправки фото для квартири " + apartmentId + " (код " + responseCode + "): " + errorResponse);
+                return false;
+            }
             
         } catch (Exception e) {
-            if (verbose) {
-                System.err.println("❌ Помилка відправки повідомлення з фото: " + e.getMessage());
-            }
+            logWarn("[TELEGRAM] Виняток при відправці фото для квартири " + apartmentId + ": " + e.getMessage());
             return false;
         }
     }
@@ -284,7 +323,7 @@ public class TelegramService {
             }
             
             // Якщо кілька фото, використовуємо sendMediaGroup
-            return sendMediaGroup(chatId, message, photoFiles, apartmentId);
+            return sendMediaGroup(chatId, message, photoPaths, apartmentId);
             
         } catch (Exception e) {
             if (verbose) {
@@ -297,89 +336,181 @@ public class TelegramService {
     /**
      * Відправляє групу медіа (кілька фото з підписом)
      */
-    private boolean sendMediaGroup(String chatId, String message, List<File> photoFiles, int apartmentId) {
+    private boolean sendMediaGroup(String chatId, String message, java.util.List<String> photoPaths, int apartmentId) {
         try {
+            java.util.List<java.io.File> photoFiles = new java.util.ArrayList<>();
+            for (String path : photoPaths) {
+                java.io.File f = new java.io.File(path);
+                if (f.exists()) {
+                    photoFiles.add(f);
+                }
+            }
+            
+            if (photoFiles.size() < 2) {
+                return false;
+            }
+            
             String url = String.format("https://api.telegram.org/bot%s/sendMediaGroup", botToken);
+            String boundary = "*****" + System.currentTimeMillis() + "*****";
             
-            // Створюємо JSON для sendMediaGroup
-            JSONArray mediaArray = new JSONArray();
-            
+            // Створюємо JSON масив media
+            org.json.JSONArray mediaArray = new org.json.JSONArray();
             for (int i = 0; i < photoFiles.size(); i++) {
-                File photoFile = photoFiles.get(i);
-                JSONObject mediaItem = new JSONObject();
+                org.json.JSONObject mediaItem = new org.json.JSONObject();
                 mediaItem.put("type", "photo");
                 mediaItem.put("media", "attach://photo" + i);
-                
-                // Додаємо підпис тільки до першого фото
-                if (i == 0) {
-                    mediaItem.put("caption", message != null ? message.replace("*", "") : "");
+                if (i == 0 && message != null && !message.isEmpty()) {
+                    mediaItem.put("caption", message);
                 }
-                
                 mediaArray.put(mediaItem);
             }
             
-            // Створюємо multipart запит
-            org.jsoup.Connection connection = Jsoup.connect(url)
-                    .ignoreContentType(true)
-                    .method(org.jsoup.Connection.Method.POST);
+            java.net.URL urlObj = new java.net.URL(url);
+            java.net.HttpURLConnection connection = (java.net.HttpURLConnection) urlObj.openConnection();
+            connection.setRequestMethod("POST");
+            connection.setDoOutput(true);
+            connection.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + boundary);
             
-            // Додаємо chat_id та media
-            connection.data("chat_id", chatId);
-            connection.data("media", mediaArray.toString());
-            
-            // Додаємо всі файли
-            for (int i = 0; i < photoFiles.size(); i++) {
-                File photoFile = photoFiles.get(i);
-                connection.data("photo" + i, photoFile.getName(), new java.io.FileInputStream(photoFile), "image/webp");
+            try (java.io.OutputStream outputStream = connection.getOutputStream();
+                 java.io.PrintWriter writer = new java.io.PrintWriter(new java.io.OutputStreamWriter(outputStream, "UTF-8"), true)) {
+                
+                // Додаємо chat_id
+                writer.append("--").append(boundary).append("\r\n");
+                writer.append("Content-Disposition: form-data; name=\"chat_id\"").append("\r\n");
+                writer.append("\r\n");
+                writer.append(chatId).append("\r\n");
+                
+                // Додаємо media JSON
+                writer.append("--").append(boundary).append("\r\n");
+                writer.append("Content-Disposition: form-data; name=\"media\"").append("\r\n");
+                writer.append("\r\n");
+                writer.append(mediaArray.toString()).append("\r\n");
+                
+                // Додаємо всі фото
+                for (int i = 0; i < photoFiles.size(); i++) {
+                    java.io.File photoFile = photoFiles.get(i);
+                    writer.append("--").append(boundary).append("\r\n");
+                    writer.append("Content-Disposition: form-data; name=\"photo").append(String.valueOf(i)).append("\"; filename=\"").append(photoFile.getName()).append("\"").append("\r\n");
+                    writer.append("Content-Type: image/webp").append("\r\n");
+                    writer.append("\r\n");
+                    writer.flush();
+                    
+                    try (java.io.FileInputStream inputStream = new java.io.FileInputStream(photoFile)) {
+                        byte[] buffer = new byte[4096];
+                        int bytesRead;
+                        while ((bytesRead = inputStream.read(buffer)) != -1) {
+                            outputStream.write(buffer, 0, bytesRead);
+                        }
+                        outputStream.flush();
+                    }
+                    writer.append("\r\n");
+                }
+                
+                writer.append("--").append(boundary).append("--").append("\r\n");
+                writer.flush();
             }
             
-            String response = null;
-            try {
-                response = connection.execute().body();
-                JSONObject responseJson = new JSONObject(response);
-                boolean success = responseJson.getBoolean("ok");
-                if (!success && verbose) {
-                    System.err.println("❌ Telegram API помилка: " + responseJson.optString("description", "Невідома помилка"));
-                    // Повний лог
-                    System.err.println("=== ПОВНИЙ ЛОГ ВІДПРАВКИ sendMediaGroup ===");
-                    System.err.println("chatId: " + chatId);
-                    System.err.println("apartmentId: " + apartmentId);
-                    System.err.println("Кількість фото: " + photoFiles.size());
-                    for (File photoFile : photoFiles) {
-                        System.err.println("Фото: " + photoFile.getAbsolutePath() + " | Розмір: " + photoFile.length() + " байт");
-                    }
-                    System.err.println("Caption довжина: " + (message != null ? message.length() : 0));
-                    System.err.println("Caption: " + message);
-                    System.err.println("JSON mediaArray: " + mediaArray.toString());
-                    System.err.println("Відповідь Telegram: " + response);
-                    System.err.println("============================================");
-                }
-                return success;
-            } catch (Exception e) {
-                if (verbose) {
-                    System.err.println("❌ Помилка відправки групи медіа: " + e.getMessage());
-                    // Повний лог
-                    System.err.println("=== ПОВНИЙ ЛОГ ВІДПРАВКИ sendMediaGroup (EXCEPTION) ===");
-                    System.err.println("chatId: " + chatId);
-                    System.err.println("apartmentId: " + apartmentId);
-                    System.err.println("Кількість фото: " + photoFiles.size());
-                    for (File photoFile : photoFiles) {
-                        System.err.println("Фото: " + photoFile.getAbsolutePath() + " | Розмір: " + photoFile.length() + " байт");
-                    }
-                    System.err.println("Caption довжина: " + (message != null ? message.length() : 0));
-                    System.err.println("Caption: " + message);
-                    System.err.println("JSON mediaArray: " + mediaArray.toString());
-                    if (response != null) System.err.println("Відповідь Telegram: " + response);
-                    System.err.println("============================================");
-                }
+            int responseCode = connection.getResponseCode();
+            
+            java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(
+                responseCode >= 400 ? connection.getErrorStream() : connection.getInputStream()));
+            StringBuilder response = new StringBuilder();
+            String line;
+            while ((line = reader.readLine()) != null) {
+                response.append(line);
+            }
+            reader.close();
+            
+            if (responseCode == 200) {
+                org.json.JSONObject responseJson = new org.json.JSONObject(response.toString());
+                return responseJson.optBoolean("ok", false);
+            } else {
                 return false;
             }
             
         } catch (Exception e) {
-            if (verbose) {
-                System.err.println("❌ Помилка відправки групи медіа: " + e.getMessage());
-            }
             return false;
+        }
+    }
+
+    private String formatApartmentMessagePlain(Apartment apartment) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("НОВА КВАРТИРА ДЛЯ ОРЕНДИ\n\n");
+        
+        // Важлива інформація, яка завжди повинна залишатися
+        String importantInfo = String.format(
+            "📍 Адреса: %s\n💰 Ціна: %s\n🏢 Поверх: %d/%d\n🛏 Кімнат: %d\n📐 Площа: %.1f м²",
+            apartment.getAddress(),
+            formatPrice(apartment.getPrice()),
+            apartment.getFloor(),
+            apartment.getFloorsCount(),
+            apartment.getRooms(),
+            apartment.getArea()
+        );
+        
+        if (apartment.getPhone() != null && !apartment.getPhone().isEmpty()) {
+            importantInfo += "\n📞 Телефон: " + apartment.getPhone();
+        }
+        
+        // Додаємо опис, якщо є
+        if (apartment.getDescription() != null && !apartment.getDescription().isEmpty()) {
+            // Розраховуємо скільки символів можемо використати для опису
+            int headerLength = sb.length();
+            int importantInfoLength = importantInfo.length();
+            int maxDescriptionLength = 1024 - headerLength - importantInfoLength - 20; // 20 для запасів
+            
+            if (maxDescriptionLength > 50) { // Мінімальна довжина для опису
+                String description = apartment.getDescription();
+                
+                if (description.length() > maxDescriptionLength) {
+                    // Обрізаємо по останньому повному реченню
+                    description = description.substring(0, maxDescriptionLength);
+                    int lastDot = description.lastIndexOf(".");
+                    int lastExcl = description.lastIndexOf("!");
+                    int lastQuest = description.lastIndexOf("?");
+                    int lastSentence = Math.max(lastDot, Math.max(lastExcl, lastQuest));
+                    
+                    if (lastSentence > 30) { // Якщо знайшли речення не на початку
+                        description = description.substring(0, lastSentence + 1);
+                    } else {
+                        // Якщо не знайшли речення, обрізаємо по останньому пробілу
+                        int lastSpace = description.lastIndexOf(" ");
+                        if (lastSpace > 50) {
+                            description = description.substring(0, lastSpace) + "...";
+                        } else {
+                            description = description + "...";
+                        }
+                    }
+                }
+                
+                sb.append("📝 Опис: ").append(description).append("\n\n");
+            }
+        }
+        
+        sb.append(importantInfo);
+        
+        String result = sb.toString();
+        
+        // Фінальна перевірка - якщо текст все ще занадто довгий, обрізаємо його
+        if (result.length() > 1024) {
+            // Залишаємо тільки заголовок і важливу інформацію
+            String essentialInfo = "НОВА КВАРТИРА ДЛЯ ОРЕНДИ\n\n" + importantInfo;
+            if (essentialInfo.length() > 1024) {
+                // Якщо навіть важлива інформація занадто довга, обрізаємо її
+                return essentialInfo.substring(0, 1021) + "...";
+            }
+            return essentialInfo;
+        }
+        
+        return result;
+    }
+
+    private void logWarn(String msg) {
+        System.out.println(msg);
+        try (java.io.FileWriter fw = new java.io.FileWriter("warnings.log", true)) {
+            fw.write(java.time.LocalDateTime.now() + " " + msg + "\n");
+        } catch (Exception e) {
+            System.err.println("[LOG] Не вдалося записати у warnings.log: " + e.getMessage());
         }
     }
 } 

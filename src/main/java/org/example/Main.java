@@ -51,7 +51,7 @@ public class Main {
         if ("your_bot_token_here".equals(botToken) || 
             "your_chat_id1_here".equals(chatId1) || 
             "your_chat_id2_here".equals(chatId2)) {
-            System.err.println("❌ Налаштування Telegram не завершено. Перевірте config.properties");
+            System.err.println("❌ Налаштування Telegram не завершено. Перевірте 1config.properties");
             return false;
         }
         
@@ -64,9 +64,10 @@ public class Main {
         
         DatabaseManager dbManager = DatabaseManager.getInstance();
         
-        // Створюємо таблиці для обох областей
-        dbManager.createTable("Apartments_Lviv");
-        dbManager.createTable("Apartments_IvanoFrankivsk");
+        // Створюємо таблиці для всіх міст із config
+        for (org.example.config.CityConfig.City city : org.example.config.CityConfig.getCities()) {
+            dbManager.createTable(city.dbTable);
+        }
         
         System.out.println("✅ База даних ініціалізована");
     }
@@ -78,17 +79,13 @@ public class Main {
             case "parse":
                 System.out.println("🔄 Запуск парсингу...");
                 RiaParserService parser = new RiaParserService();
-                parser.parseApartments();
+                parser.parseApartmentsForAllCities();
                 break;
                 
             case "post":
                 System.out.println("📤 Запуск постингу...");
                 PostingService postingService = new PostingService();
-                if (postingService.postMorningApartments()) {
-                    System.out.println("✅ Постинг завершено");
-                } else {
-                    System.out.println("⚠️ Постинг не вдався - немає оголошень");
-                }
+                postingService.postMorningApartmentsForAllCities(org.example.config.CityConfig.getCities());
                 break;
                 
             case "auto":
@@ -186,7 +183,7 @@ public class Main {
         System.out.println("\n🔄 Починаємо парсинг...");
         try {
             RiaParserService parser = new RiaParserService();
-            parser.parseApartments();
+            parser.parseApartmentsForAllCities();
             System.out.println("✅ Парсинг завершено!");
         } catch (Exception e) {
             System.err.println("❌ Помилка парсингу: " + e.getMessage());
@@ -197,11 +194,8 @@ public class Main {
         System.out.println("\n📤 Починаємо постинг...");
         try {
             PostingService postingService = new PostingService();
-            if (postingService.postMorningApartments()) {
-                System.out.println("✅ Постинг завершено!");
-            } else {
-                System.out.println("⚠️ Постинг не вдався - немає оголошень");
-            }
+            postingService.postMorningApartmentsForAllCities(org.example.config.CityConfig.getCities());
+            System.out.println("✅ Постинг завершено");
         } catch (Exception e) {
             System.err.println("❌ Помилка постингу: " + e.getMessage());
         }

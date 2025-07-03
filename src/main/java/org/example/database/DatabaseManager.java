@@ -167,12 +167,14 @@ public class DatabaseManager {
             // Встановлюємо час - 24 години тому
             LocalDateTime dayAgo = LocalDateTime.now().minusHours(24);
             String dayAgoStr = dayAgo.format(formatter);
+            
             pstmt.setString(1, dayAgoStr);
             pstmt.setInt(2, limit);
             ResultSet rs = pstmt.executeQuery();
             while (rs.next()) {
                 apartments.add(mapResultSetToApartment(rs));
             }
+            
         } catch (SQLException e) {
             System.err.println("❌ Помилка отримання квартир з останніх 24 годин: " + e.getMessage());
         }
@@ -257,6 +259,16 @@ public class DatabaseManager {
             
         } catch (SQLException e) {
             System.err.println("❌ Помилка видалення квартири: " + e.getMessage());
+        }
+    }
+    
+    public void clearTable(String tableName) {
+        String sql = "DELETE FROM " + tableName;
+        try (java.sql.Connection conn = getConnection(); java.sql.Statement stmt = conn.createStatement()) {
+            stmt.executeUpdate(sql);
+            System.out.println("Таблицю " + tableName + " очищено.");
+        } catch (Exception e) {
+            System.err.println("Помилка очищення таблиці " + tableName + ": " + e.getMessage());
         }
     }
     

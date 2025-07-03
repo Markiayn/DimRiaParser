@@ -80,13 +80,17 @@ public class PostingService {
         if (verbose) {
             System.out.println("🌅 Починаємо постинг ранкових оголошень...");
         }
-        // Отримуємо квартири з обох таблиць за останні 24 години
-        List<Apartment> lvivApartments = databaseManager.getUnpostedApartmentsFromLast24Hours("Apartments_Lviv", 2);
-        List<Apartment> ivanoFrankivskApartments = databaseManager.getUnpostedApartmentsFromLast24Hours("Apartments_IvanoFrankivsk", 2);
-        // Об'єднуємо списки
+        
+        // Отримуємо список всіх міст
+        List<org.example.config.CityConfig.City> cities = org.example.config.CityConfig.getCities();
         List<Apartment> allApartments = new ArrayList<>();
-        allApartments.addAll(lvivApartments);
-        allApartments.addAll(ivanoFrankivskApartments);
+        
+        // Збираємо квартири з усіх таблиць
+        for (org.example.config.CityConfig.City city : cities) {
+            List<Apartment> cityApartments = databaseManager.getUnpostedApartments(city.dbTable, 2);
+            allApartments.addAll(cityApartments);
+        }
+        
         // Сортуємо за датою створення (найновіші спочатку)
         allApartments.sort((a1, a2) -> {
             if (a1.getCreatedAt() == null && a2.getCreatedAt() == null) return 0;
@@ -94,10 +98,12 @@ public class PostingService {
             if (a2.getCreatedAt() == null) return -1;
             return a2.getCreatedAt().compareTo(a1.getCreatedAt());
         });
+        
         // Беремо лише 2 найновіших
         if (allApartments.size() > 2) {
             allApartments = allApartments.subList(0, 2);
         }
+        
         return postSmart(allApartments);
     }
     
@@ -109,13 +115,15 @@ public class PostingService {
             System.out.println("⏰ Починаємо щогодинний постинг...");
         }
         
-        // Спочатку пробуємо нові оголошення останньої години з обох таблиць
-        List<Apartment> lvivRecent = databaseManager.getUnpostedApartmentsFromLastHour("Apartments_Lviv", 5);
-        List<Apartment> ivanoFrankivskRecent = databaseManager.getUnpostedApartmentsFromLastHour("Apartments_IvanoFrankivsk", 5);
-        
+        // Отримуємо список всіх міст
+        List<org.example.config.CityConfig.City> cities = org.example.config.CityConfig.getCities();
         List<Apartment> recentApartments = new ArrayList<>();
-        recentApartments.addAll(lvivRecent);
-        recentApartments.addAll(ivanoFrankivskRecent);
+        
+        // Спочатку пробуємо нові оголошення останньої години з усіх таблиць
+        for (org.example.config.CityConfig.City city : cities) {
+            List<Apartment> cityRecent = databaseManager.getUnpostedApartmentsFromLastHour(city.dbTable, 5);
+            recentApartments.addAll(cityRecent);
+        }
         
         if (recentApartments != null && !recentApartments.isEmpty()) {
             if (verbose) {
@@ -123,9 +131,9 @@ public class PostingService {
             }
             return postSmart(recentApartments);
         } else {
-            // Якщо нових немає, беремо з ранкових
+            // Якщо нових немає, беремо всі неопубліковані (без фільтра за часом)
             if (verbose) {
-                System.out.println("📅 Використовуємо ранкові оголошення (нових немає)");
+                System.out.println("📅 Використовуємо всі неопубліковані оголошення (нових немає)");
             }
             return postMorningApartments();
         }
@@ -134,7 +142,7 @@ public class PostingService {
     /**
      * Позначає квартиру як опубліковану
      */
-    private void markAsPublished(Apartment apartment) {
+    public void markAsPublished(Apartment apartment) {
         try {
             // Визначаємо в якій таблиці знаходиться квартира
             String tableName = determineTableName(apartment);
@@ -151,15 +159,15 @@ public class PostingService {
      * Визначає в якій таблиці знаходиться квартира
      */
     private String determineTableName(Apartment apartment) {
-        // Простий спосіб - спробуємо знайти квартиру в обох таблицях
-        Optional<Apartment> lvivApartment = databaseManager.getApartmentById("Apartments_Lviv", apartment.getId());
-        if (lvivApartment.isPresent()) {
-            return "Apartments_Lviv";
-        }
+        // Отримуємо список всіх міст з конфігурації
+        List<org.example.config.CityConfig.City> cities = org.example.config.CityConfig.getCities();
         
-        Optional<Apartment> ivanoFrankivskApartment = databaseManager.getApartmentById("Apartments_IvanoFrankivsk", apartment.getId());
-        if (ivanoFrankivskApartment.isPresent()) {
-            return "Apartments_IvanoFrankivsk";
+        // Перевіряємо квартиру в кожній таблиці
+        for (org.example.config.CityConfig.City city : cities) {
+            Optional<Apartment> foundApartment = databaseManager.getApartmentById(city.dbTable, apartment.getId());
+            if (foundApartment.isPresent()) {
+                return city.dbTable;
+            }
         }
         
         // Якщо не знайдено, повертаємо за замовчуванням
@@ -280,11 +288,13 @@ public class PostingService {
     public void publishPostsForAllCitiesWithSmartLogic(int postsPerCity) {
         System.out.println("🌍 Публікація постів для всіх міст з розумною логікою...");
         
-        // Львів
-        publishPostsForCityWithSmartLogic("Apartments_Lviv", postsPerCity);
+        // Отримуємо список всіх міст
+        List<org.example.config.CityConfig.City> cities = org.example.config.CityConfig.getCities();
         
-        // Івано-Франківськ
-        publishPostsForCityWithSmartLogic("Apartments_IvanoFrankivsk", postsPerCity);
+        // Публікуємо для кожного міста
+        for (org.example.config.CityConfig.City city : cities) {
+            publishPostsForCityWithSmartLogic(city.dbTable, postsPerCity);
+        }
     }
     
     /**
@@ -300,12 +310,12 @@ public class PostingService {
             System.out.println("🆕 Знайдено " + newApartments.size() + " нових квартир (остання година)");
             publishApartmentsList(tableName, newApartments);
         } else {
-            // Якщо нових немає, беремо зранку
-            System.out.println("📅 Нових квартир немає, беремо зранку");
-            List<Apartment> morningApartments = databaseManager.getUnpostedApartments(tableName, postsCount);
+            // Якщо нових немає, беремо всі неопубліковані (без фільтра за часом)
+            System.out.println("📅 Нових квартир немає, беремо всі неопубліковані");
+            List<Apartment> allUnpostedApartments = databaseManager.getUnpostedApartments(tableName, postsCount);
             
-            if (!morningApartments.isEmpty()) {
-                publishApartmentsList(tableName, morningApartments);
+            if (!allUnpostedApartments.isEmpty()) {
+                publishApartmentsList(tableName, allUnpostedApartments);
             } else {
                 System.out.println("⚠️ Немає неопублікованих квартир для " + tableName);
             }
@@ -360,11 +370,13 @@ public class PostingService {
     public void publishPostsForAllCities(int postsPerCity) {
         System.out.println("🌍 Публікація постів для всіх міст...");
         
-        // Львів
-        publishPostsForCity("Apartments_Lviv", postsPerCity);
+        // Отримуємо список всіх міст
+        List<org.example.config.CityConfig.City> cities = org.example.config.CityConfig.getCities();
         
-        // Івано-Франківськ
-        publishPostsForCity("Apartments_IvanoFrankivsk", postsPerCity);
+        // Публікуємо для кожного міста
+        for (org.example.config.CityConfig.City city : cities) {
+            publishPostsForCity(city.dbTable, postsPerCity);
+        }
     }
     
     /**
@@ -373,22 +385,18 @@ public class PostingService {
     public void printStatistics() {
         System.out.println("\n📊 Статистика по містах:");
         
-        List<Apartment> lvivApartments = databaseManager.getUnpostedApartments("Apartments_Lviv", 1000);
-        List<Apartment> frankivskApartments = databaseManager.getUnpostedApartments("Apartments_IvanoFrankivsk", 1000);
+        // Отримуємо список всіх міст
+        List<org.example.config.CityConfig.City> cities = org.example.config.CityConfig.getCities();
         
-        System.out.println("🏙 Львівська область: " + lvivApartments.size() + " неопублікованих квартир");
-        System.out.println("🏙 Івано-Франківська область: " + frankivskApartments.size() + " неопублікованих квартир");
-        
-        if (!lvivApartments.isEmpty()) {
-            Apartment newestLviv = lvivApartments.get(0);
-            System.out.println("   Найновіша квартира у Львові: " + newestLviv.getId() + " (" + 
-                              formatDate(newestLviv.getCreatedAt()) + ")");
-        }
-        
-        if (!frankivskApartments.isEmpty()) {
-            Apartment newestFrankivsk = frankivskApartments.get(0);
-            System.out.println("   Найновіша квартира у Івано-Франківську: " + newestFrankivsk.getId() + " (" + 
-                              formatDate(newestFrankivsk.getCreatedAt()) + ")");
+        for (org.example.config.CityConfig.City city : cities) {
+            List<Apartment> cityApartments = databaseManager.getUnpostedApartments(city.dbTable, 1000);
+            System.out.println("🏙 " + city.name + ": " + cityApartments.size() + " неопублікованих квартир");
+            
+            if (!cityApartments.isEmpty()) {
+                Apartment newest = cityApartments.get(0);
+                System.out.println("   Найновіша квартира: " + newest.getId() + " (" + 
+                                  formatDate(newest.getCreatedAt()) + ")");
+            }
         }
     }
     
@@ -400,5 +408,63 @@ public class PostingService {
         
         java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("dd.MM HH:mm");
         return dateTime.format(formatter);
+    }
+
+    /**
+     * Постинг з ранкових оголошень для одного міста (9:00)
+     */
+    public boolean postMorningApartmentsForCity(String tableName, String channel1, String channel2) {
+        if (verbose) {
+            System.out.println("🌅 Починаємо постинг ранкових оголошень для таблиці: " + tableName);
+        }
+        
+        // Використовуємо всі неопубліковані записи замість фільтра за часом
+        List<Apartment> apartments = databaseManager.getUnpostedApartments(tableName, 2);
+        
+        if (apartments.isEmpty()) {
+            return false;
+        }
+        
+        apartments.sort((a1, a2) -> {
+            if (a1.getCreatedAt() == null && a2.getCreatedAt() == null) return 0;
+            if (a1.getCreatedAt() == null) return 1;
+            if (a2.getCreatedAt() == null) return -1;
+            return a2.getCreatedAt().compareTo(a1.getCreatedAt());
+        });
+        Apartment apt1 = apartments.size() > 0 ? apartments.get(0) : null;
+        Apartment apt2 = apartments.size() > 1 ? apartments.get(1) : null;
+        
+        // Логування попереджень
+        if (channel1 == null || channel1.isEmpty() || channel2 == null || channel2.isEmpty()) {
+            logWarning("[WARN] Для таблиці " + tableName + " не вказано обидва канали. Канал1: '" + channel1 + "', Канал2: '" + channel2 + "'");
+        }
+        
+        boolean success = telegramService.sendDifferentApartmentsToChannelsCustomChannels(apt1, channel1, apt2, channel2);
+        
+        if (success) {
+            if (apt1 != null) markAsPublished(apt1);
+            if (apt2 != null) markAsPublished(apt2);
+        }
+        return success;
+    }
+
+    /**
+     * Постинг для всіх міст (ранковий)
+     */
+    public void postMorningApartmentsForAllCities(List<org.example.config.CityConfig.City> cities) {
+        for (org.example.config.CityConfig.City city : cities) {
+            postMorningApartmentsForCity(city.dbTable, city.channel1, city.channel2);
+        }
+    }
+
+    /**
+     * Логування попереджень у файл warnings.log
+     */
+    public void logWarning(String message) {
+        try (java.io.FileWriter fw = new java.io.FileWriter("warnings.log", true)) {
+            fw.write(java.time.LocalDateTime.now() + " " + message + "\n");
+        } catch (Exception e) {
+            System.err.println("[WARN] Не вдалося записати у warnings.log: " + e.getMessage());
+        }
     }
 } 
