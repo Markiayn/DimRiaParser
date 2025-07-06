@@ -108,6 +108,12 @@ public class Main {
                 }
                 break;
                 
+            case "test":
+                System.out.println("Запуск тестового автоматичного режиму (швидкий цикл)...");
+                AutoPostingScheduler testScheduler = new AutoPostingScheduler();
+                testScheduler.startTestScheduledPosting();
+                break;
+                
             default:
                 System.err.println("Невідома команда: " + command);
                 printUsage();
@@ -125,6 +131,7 @@ public class Main {
             System.out.println("3. Автоматичний режим (з 8:00)");
             System.out.println("4. Автоматичний режим (з поточного моменту)");
             System.out.println("5. Вихід");
+            System.out.println("6. Тестовий автоматичний режим (швидкий цикл)");
             System.out.print("Ваш вибір: ");
             
             String choice = scanner.nextLine().trim();
@@ -149,6 +156,10 @@ public class Main {
                 case "5":
                     System.out.println("До побачення!");
                     return;
+                    
+                case "6":
+                    runTestAutoMode();
+                    break;
                     
                 default:
                     System.out.println("Невірний вибір. Спробуйте ще раз.");
@@ -211,6 +222,12 @@ public class Main {
         }
     }
     
+    private static void runTestAutoMode() {
+        System.out.println("\nЗапуск тестового автоматичного режиму (швидкий цикл)...");
+        AutoPostingScheduler scheduler = new AutoPostingScheduler();
+        scheduler.startTestScheduledPosting();
+    }
+    
     private static void printUsage() {
         System.out.println("\nВикористання:");
         System.out.println("  java -jar DimRiaParser.jar [команда]");
@@ -219,6 +236,7 @@ public class Main {
         System.out.println("  post    - Постинг оголошень");
         System.out.println("  auto    - Автоматичний режим (з 8:00)");
         System.out.println("  autonow - Автоматичний режим (з поточного моменту)");
+        System.out.println("  test    - Тестовий автоматичний режим (швидкий цикл)");
         System.out.println("\nБез аргументів запускається інтерактивний режим");
     }
 }

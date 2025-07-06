@@ -37,9 +37,9 @@ public class RiaParserService {
         this.verbose = AppConfig.isVerbose();
     }
     
-    public void parseApartmentsForAllCities() {
+    // Новий метод для ранкового парсингу з очищенням
+    public void parseApartmentsForAllCitiesMorning() {
         org.example.utils.FileUtils.deleteAllPhotos(photosDirectory);
-
         for (org.example.config.CityConfig.City city : org.example.config.CityConfig.getCities()) {
             databaseManager.clearTable(city.dbTable);
             System.out.println("Парсинг міста: " + city.name + " (cityId=" + city.cityId + ", таблиця: " + city.dbTable + ", годин: " + city.hours + ")");
@@ -57,8 +57,25 @@ public class RiaParserService {
             );
         }
     }
-    
 
+    // Звичайний парсинг протягом дня — без очищення
+    public void parseApartmentsForAllCities() {
+        for (org.example.config.CityConfig.City city : org.example.config.CityConfig.getCities()) {
+            System.out.println("Парсинг міста: " + city.name + " (cityId=" + city.cityId + ", таблиця: " + city.dbTable + ", годин: " + city.hours + ")");
+            parseApartments(
+                city.dbTable,
+                city.cityId,
+                null,
+                2,
+                3,
+                city.hours,
+                AppConfig.getMaxPages(),
+                AppConfig.getMinRooms(),
+                AppConfig.getMinArea(),
+                AppConfig.getMaxPhotosPerApartment()
+            );
+        }
+    }
     
     public void parseApartments(String tableName, int regionId, Integer cityId, 
                                int realtyType, int operationType, int hoursLimit, 

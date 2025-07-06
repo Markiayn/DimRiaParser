@@ -222,69 +222,44 @@ public class PostingService {
     }
     
     public void publishPostsForAllCitiesWithSmartLogic(int postsPerCity) {
-        System.out.println("Публікація постів для всіх міст з розумною логікою...");
-        
+        System.out.println("Публікація постів для всіх міст (ручна логіка, просто найновіші)...");
         List<org.example.config.CityConfig.City> cities = org.example.config.CityConfig.getCities();
-        
         for (org.example.config.CityConfig.City city : cities) {
-            publishPostsForCityWithSmartLogic(city.dbTable, postsPerCity);
+            postMorningApartmentsForCity(city.dbTable, city.channel1, city.channel2);
         }
+    }
+
+    public void publishPostsForCityWithSmartLogic(org.example.config.CityConfig.City city) {
+        String tableName = city.dbTable;
+        String channel1 = city.channel1;
+        String channel2 = city.channel2;
+        System.out.println("\nПублікація постів для " + tableName + " (ручна логіка)...");
+        List<Apartment> apartments = databaseManager.getUnpostedApartments(tableName, 2);
+        if (apartments.isEmpty()) {
+            System.out.println("Немає неопублікованих квартир для " + tableName);
+            return;
+        }
+        apartments.sort((a1, a2) -> {
+            if (a1.getCreatedAt() == null && a2.getCreatedAt() == null) return 0;
+            if (a1.getCreatedAt() == null) return 1;
+            if (a2.getCreatedAt() == null) return -1;
+            return a2.getCreatedAt().compareTo(a1.getCreatedAt());
+        });
+        Apartment apt1 = apartments.size() > 0 ? apartments.get(0) : null;
+        Apartment apt2 = apartments.size() > 1 ? apartments.get(1) : null;
+        if (channel1 == null || channel1.isEmpty() || channel2 == null || channel2.isEmpty()) {
+            logWarning("[WARN] Для таблиці " + tableName + " не вказано обидва канали. Канал1: '" + channel1 + "', Канал2: '" + channel2 + "'");
+        }
+        boolean success = false;
+        if (apt1 != null) success |= telegramService.sendApartmentPost(apt1, channel1);
+        if (apt2 != null) success |= telegramService.sendApartmentPost(apt2, channel2);
+        if (success) {
+            if (apt1 != null) markAsPublished(apt1);
+            if (apt2 != null) markAsPublished(apt2);
+        }
+        System.out.println("Опубліковано " + (success ? (apt1 != null ? 1 : 0) + (apt2 != null ? 1 : 0) : 0) + " з " + apartments.size() + " квартир для " + tableName);
     }
     
-    public void publishPostsForCityWithSmartLogic(String tableName, int postsCount) {
-        System.out.println("\nПублікація постів для " + tableName + " з розумною логікою...");
-        
-        List<Apartment> newApartments = databaseManager.getUnpostedApartmentsFromLastHour(tableName, postsCount);
-        
-        if (!newApartments.isEmpty()) {
-            System.out.println("Знайдено " + newApartments.size() + " нових квартир (остання година)");
-            publishApartmentsList(tableName, newApartments);
-        } else {
-            System.out.println("Нових квартир немає, беремо всі неопубліковані");
-            List<Apartment> allUnpostedApartments = databaseManager.getUnpostedApartments(tableName, postsCount);
-            
-            if (!allUnpostedApartments.isEmpty()) {
-                publishApartmentsList(tableName, allUnpostedApartments);
-            } else {
-                System.out.println("Немає неопублікованих квартир для " + tableName);
-            }
-        }
-    }
-    
-    private void publishApartmentsList(String tableName, List<Apartment> apartments) {
-        int publishedCount = 0;
-        
-        for (Apartment apartment : apartments) {
-            if (apartment.getPhotoPaths() == null || apartment.getPhotoPaths().isEmpty()) {
-                if (verbose) {
-                    System.out.println("Квартира " + apartment.getId() + " без фотографій - пропускаємо");
-                }
-                continue;
-            }
-            
-            boolean success = telegramService.sendToBothChannels(apartment);
-            
-            if (success) {
-                databaseManager.markAsPosted(tableName, apartment.getId());
-                publishedCount++;
-                
-                if (verbose) {
-                    System.out.println("Опубліковано квартиру " + apartment.getId() + " в " + tableName);
-                }
-                
-                try {
-                    Thread.sleep(2000);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    break;
-                }
-            } else {
-                System.err.println("Не вдалося опублікувати квартиру " + apartment.getId());
-            }
-        }
-        
-        System.out.println("Опубліковано " + publishedCount + " з " + apartments.size() + " квартир для " + tableName);
-    }
     public void publishPostsForAllCities(int postsPerCity) {
         System.out.println("🌍 Публікація постів для всіх міст...");
         
@@ -359,7 +334,9 @@ public class PostingService {
         
         boolean success = false;
         if (apt1 != null) success |= telegramService.sendApartmentPost(apt1, channel1);
-        if (apt2 != null) success |= telegramService.sendApartmentPost(apt2, channel2);
+        if (apt2 != null && channel2 != null && !channel2.isEmpty()) {
+            success |= telegramService.sendApartmentPost(apt2, channel2);
+        }
         
         if (success) {
             if (apt1 != null) markAsPublished(apt1);
