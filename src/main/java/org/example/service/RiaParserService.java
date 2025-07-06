@@ -102,6 +102,16 @@ public class RiaParserService {
                              hashHolder, phoneHolder, stats)) {
                     break;
                 }
+                
+                // Мінімальна затримка між сторінками
+                if (page < maxPages - 1) { // Не чекаємо після останньої сторінки
+                    try {
+                        Thread.sleep(500); // 500 мс затримки між сторінками
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        break;
+                    }
+                }
             }
             
             stats.printSummary(hoursLimit);
@@ -132,6 +142,7 @@ public class RiaParserService {
             Connection.Response response = Jsoup.connect(url)
                     .ignoreContentType(true)
                     .userAgent("Mozilla/5.0")
+                    .timeout(8000) // 8 секунд таймаут для пошукового API
                     .execute();
             
             JSONObject searchResult = new JSONObject(response.body());
@@ -149,6 +160,14 @@ public class RiaParserService {
                 if (processApartment(tableName, id, driver, formatter, hashHolder, 
                                    phoneHolder, hoursLimit, stats, minRooms, minArea, maxPhotos)) {
                     stats.shown++;
+                }
+                
+                // Мінімальна затримка між обробкою квартир
+                try {
+                    Thread.sleep(200); // 200 мс затримки для стабільності
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
                 }
             }
             
@@ -223,10 +242,13 @@ public class RiaParserService {
             String response = Jsoup.connect("https://dom.ria.com/realty/data/" + id + "?lang_id=4&key=")
                     .ignoreContentType(true)
                     .userAgent("Mozilla/5.0")
+                    .timeout(5000) // 5 секунд таймаут
                     .execute().body();
             return new JSONObject(response);
         } catch (Exception e) {
-            System.err.println("❌ Помилка отримання даних для ID " + id + ": " + e.getMessage());
+            if (verbose) {
+                System.err.println("❌ Помилка отримання даних для ID " + id + ": " + e.getMessage());
+            }
             return null;
         }
     }
@@ -305,18 +327,18 @@ public class RiaParserService {
                 if (verbose) System.out.println("⚠️ Кнопка 'Дивитися всі фото' не знайдена");
             }
             
-            // Прокручуємо фотографії
-            for (int i = 0; i < 5; i++) {
+            // Прокручуємо фотографії для отримання 5 фото
+            for (int i = 0; i < 5; i++) { // Повернуто до 5 прокруток
                 try {
                     WebElement nextButton = driver.findElement(By.cssSelector("button.rotate-btn.rotate-arr-r"));
                     ((JavascriptExecutor) driver).executeScript("arguments[0].click();", nextButton);
-                    Thread.sleep(500);
+                    Thread.sleep(200); // Залишаємо швидку затримку
                 } catch (Exception e) {
                     break;
                 }
             }
             
-            Thread.sleep(1500);
+            Thread.sleep(800); // Зменшено з 1500 до 800 мс
             
             // Завантажуємо фотографії
             int counter = 1;
@@ -329,12 +351,18 @@ public class RiaParserService {
                     apartment.addPhotoPath(photoFileName);
                     counter++;
                     if (apartment.getPhotoPaths().size() >= maxPhotos) break;
-                } catch (IOException ignored) {}
+                } catch (IOException e) {
+                    if (verbose) {
+                        System.err.println("⚠️ Помилка завантаження фото " + photoUrl + ": " + e.getMessage());
+                    }
+                }
             }
             interceptedFxPhotos.clear();
             
         } catch (Exception e) {
-            System.err.println("❌ Помилка завантаження фотографій: " + e.getMessage());
+            if (verbose) {
+                System.err.println("❌ Помилка завантаження фотографій: " + e.getMessage());
+            }
         }
     }
     
@@ -346,18 +374,28 @@ public class RiaParserService {
                 JSONObject obj = new JSONObject(Jsoup.connect(apiUrl)
                         .ignoreContentType(true)
                         .userAgent("Mozilla/5.0")
+                        .timeout(5000) // 5 секунд таймаут
                         .execute().body());
                 
-                String phone = obj.getJSONObject("owner").getJSONArray("phones").getJSONObject(0).getString("phone_num");
-                phoneHolder[0] = phone;
-                if (verbose) System.out.println("📞 Номер телефону: " + phone);
-                return phone;
+                try {
+                    String phone = obj.getJSONObject("owner").getJSONArray("phones").getJSONObject(0).getString("phone_num");
+                    phoneHolder[0] = phone;
+                    if (verbose) System.out.println("📞 Номер телефону: " + phone);
+                    return phone;
+                } catch (Exception e) {
+                    if (verbose) {
+                        System.err.println("⚠️ Помилка парсингу телефону з JSON: " + e.getMessage());
+                    }
+                    return null;
+                }
             } else {
                 if (verbose) System.out.println("❌ Hash не перехоплено.");
                 return null;
             }
         } catch (Exception e) {
-            System.err.println("❌ Помилка отримання телефону: " + e.getMessage());
+            if (verbose) {
+                System.err.println("❌ Помилка отримання телефону: " + e.getMessage());
+            }
             return null;
         }
     }
@@ -376,8 +414,20 @@ public class RiaParserService {
         options.addArguments("--disable-blink-features=AutomationControlled");
         options.addArguments("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/115.0.0.0 Safari/537.36");
         // options.addArguments("--headless=new"); // Вимкнено headless режим для візуалізації браузера
+        
+        // Оптимізація для швидкості
+        options.addArguments("--disable-extensions");
+        options.addArguments("--disable-plugins");
+        options.addArguments("--disable-gpu");
+        options.addArguments("--no-sandbox");
+        options.addArguments("--disable-dev-shm-usage");
+        options.addArguments("--disable-web-security");
+        options.addArguments("--disable-features=VizDisplayCompositor");
+        
         ChromeDriver driver = new ChromeDriver(options);
-        driver.manage().timeouts().implicitlyWait(Duration.ofSeconds(5));
+        driver.manage().timeouts().implicitlyWait(Duration.ofSeconds(5)); // Оптимізовано для швидкості
+        driver.manage().timeouts().pageLoadTimeout(Duration.ofSeconds(15)); // Таймаут завантаження сторінки
+        driver.manage().timeouts().scriptTimeout(Duration.ofSeconds(15)); // Таймаут виконання скриптів
         return driver;
     }
     

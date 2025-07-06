@@ -9,37 +9,95 @@ import java.time.LocalTime;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Optional;
+import java.io.*;
+import java.time.format.DateTimeFormatter;
 
 public class PostingService {
     private final DatabaseManager databaseManager;
     private final TelegramService telegramService;
     private final boolean verbose;
+    private final PrintWriter logWriter;
+    private final DateTimeFormatter logFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS");
     
     public PostingService() {
         this.databaseManager = DatabaseManager.getInstance();
         this.telegramService = new TelegramService();
         this.verbose = AppConfig.isVerbose();
+        this.logWriter = initializeLogWriter();
+    }
+    
+    private PrintWriter initializeLogWriter() {
+        try {
+            File logsDir = new File("logs");
+            if (!logsDir.exists()) logsDir.mkdirs();
+            String logFileName = "logs/posting_" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")) + ".txt";
+            PrintWriter writer = new PrintWriter(new FileWriter(logFileName, true));
+            logInfo("=== НОВИЙ СЕАНС POSTING SERVICE ===");
+            return writer;
+        } catch (IOException e) {
+            System.err.println("Не вдалося створити лог-файл: " + e.getMessage());
+            return null;
+        }
+    }
+
+    private void logInfo(String message) {
+        String log = "[INFO]  " + LocalDateTime.now().format(logFormatter) + " | " + message;
+        System.out.println(log);
+        if (logWriter != null) {
+            logWriter.println(log);
+            logWriter.flush();
+        }
+    }
+
+    private void logError(String message, Throwable error) {
+        String log = "[ERROR] " + LocalDateTime.now().format(logFormatter) + " | " + message;
+        System.err.println(log);
+        if (logWriter != null) {
+            logWriter.println(log);
+            error.printStackTrace(logWriter);
+            logWriter.flush();
+        }
+    }
+
+    private void logDebug(String message) {
+        String log = "[DEBUG] " + LocalDateTime.now().format(logFormatter) + " | " + message;
+        System.out.println(log);
+        if (logWriter != null) {
+            logWriter.println(log);
+            logWriter.flush();
+        }
     }
     
     /**
-     * Розумна логіка постингу: відправляє різні оголошення в різні канали
+     * Розумний постинг з нових оголошень
      */
     public boolean postSmart(List<Apartment> apartments) {
         if (apartments == null || apartments.isEmpty()) {
             if (verbose) {
-                System.out.println("⚠️ Немає квартир для постингу");
+                System.out.println("📭 Немає квартир для постингу");
             }
             return false;
         }
         
-        // Фільтруємо квартири з фото
-        List<Apartment> apartmentsWithPhotos = apartments.stream()
-                .filter(apt -> apt.getPhotoPaths() != null && !apt.getPhotoPaths().isEmpty())
-                .toList();
+        if (verbose) {
+            System.out.println("🧠 Розумний постинг " + apartments.size() + " квартир...");
+        }
+        
+        // Фільтруємо квартири з фотографіями
+        List<Apartment> apartmentsWithPhotos = new ArrayList<>();
+        for (Apartment apartment : apartments) {
+            if (apartment.getPhotoPaths() != null && !apartment.getPhotoPaths().isEmpty()) {
+                apartmentsWithPhotos.add(apartment);
+            } else {
+                if (verbose) {
+                    System.out.println("📷 Квартира " + apartment.getId() + " без фотографій - пропускаємо");
+                }
+            }
+        }
         
         if (apartmentsWithPhotos.isEmpty()) {
             if (verbose) {
-                System.out.println("⚠️ Немає квартир з фото для постингу");
+                System.out.println("📭 Немає квартир з фотографіями для постингу");
             }
             return false;
         }
@@ -364,5 +422,9 @@ public class PostingService {
         } catch (Exception e) {
             System.err.println("[LOG] Не вдалося записати у warnings.log: " + e.getMessage());
         }
+    }
+
+    public void close() {
+        if (logWriter != null) logWriter.close();
     }
 } 
