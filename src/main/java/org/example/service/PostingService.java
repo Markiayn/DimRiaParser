@@ -391,9 +391,18 @@ public class PostingService {
         }
         
         boolean success = false;
-        if (apt1 != null) success |= telegramService.sendApartmentPost(apt1, channel1);
+        if (apt1 != null && channel1 != null && !channel1.isEmpty()) {
+            System.out.println("📤 Відправляємо квартиру " + apt1.getId() + " в канал: " + channel1);
+            success |= telegramService.sendApartmentPost(apt1, channel1);
+        } else if (apt1 != null) {
+            System.out.println("❌ Не можемо відправити квартиру " + apt1.getId() + " - канал1 не налаштований");
+        }
+        
         if (apt2 != null && channel2 != null && !channel2.isEmpty()) {
+            System.out.println("📤 Відправляємо квартиру " + apt2.getId() + " в канал: " + channel2);
             success |= telegramService.sendApartmentPost(apt2, channel2);
+        } else if (apt2 != null) {
+            System.out.println("❌ Не можемо відправити квартиру " + apt2.getId() + " - канал2 не налаштований");
         }
         
         if (success) {
@@ -407,8 +416,34 @@ public class PostingService {
      * Постинг для всіх міст (ранковий)
      */
     public void postMorningApartmentsForAllCities(List<org.example.config.CityConfig.City> cities) {
+        System.out.println("🏙️ Постинг для " + cities.size() + " міст:");
+        
+        // Спочатку тестуємо доступ до всіх каналів
+        System.out.println("🔍 Тестування доступу до каналів:");
         for (org.example.config.CityConfig.City city : cities) {
-            postMorningApartmentsForCity(city.dbTable, city.channel1, city.channel2);
+            if (city.channel1 != null && !city.channel1.isEmpty()) {
+                boolean access1 = telegramService.testChannelAccess(city.channel1);
+                System.out.println("  " + city.name + " - Канал1: " + (access1 ? "✅" : "❌"));
+            }
+            if (city.channel2 != null && !city.channel2.isEmpty()) {
+                boolean access2 = telegramService.testChannelAccess(city.channel2);
+                System.out.println("  " + city.name + " - Канал2: " + (access2 ? "✅" : "❌"));
+            }
+        }
+        
+        System.out.println("\n📡 Початок постингу:");
+        for (org.example.config.CityConfig.City city : cities) {
+            System.out.println("📡 Місто: " + city.name + " | Канал1: " + city.channel1 + " | Канал2: " + city.channel2);
+            
+            if (city.channel1 == null || city.channel1.isEmpty()) {
+                System.out.println("⚠️ УВАГА: Для міста " + city.name + " не налаштований канал1!");
+            }
+            if (city.channel2 == null || city.channel2.isEmpty()) {
+                System.out.println("⚠️ УВАГА: Для міста " + city.name + " не налаштований канал2!");
+            }
+            
+            boolean success = postMorningApartmentsForCity(city.dbTable, city.channel1, city.channel2);
+            System.out.println("✅ Постинг для " + city.name + ": " + (success ? "УСПІШНО" : "НЕ ВДАЛОСЯ"));
         }
     }
 

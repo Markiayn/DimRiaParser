@@ -52,13 +52,27 @@ public class TelegramService {
     
     public boolean sendApartmentPost(Apartment apartment, String chatId) {
         try {
+            if (verbose) {
+                System.out.println("[TELEGRAM] Спроба відправки квартири " + apartment.getId() + " в канал: " + chatId);
+            }
+            
             String message = formatApartmentMessagePlain(apartment);
+            if (verbose) {
+                System.out.println("[TELEGRAM] Повідомлення для квартири " + apartment.getId() + " (довжина: " + message.length() + " символів)");
+            }
+            
             java.util.List<String> photos = apartment.getPhotoPaths();
 
             if (photos == null || photos.isEmpty()) {
+                if (verbose) {
+                    System.out.println("[TELEGRAM] Квартира " + apartment.getId() + " не має фото");
+                }
                 return false;
             }
             if (chatId == null || chatId.isEmpty()) {
+                if (verbose) {
+                    System.out.println("[TELEGRAM] Не вказано канал для квартири " + apartment.getId());
+                }
                 return false;
             }
             
@@ -66,14 +80,33 @@ public class TelegramService {
                 logWarn("[TELEGRAM] Повідомлення для квартири " + apartment.getId() + " було обрізано з " + message.length() + " до 1024 символів");
             }
             
+            boolean result = false;
             if (photos.size() == 1) {
-                return sendMessageWithPhoto(chatId, message, photos.get(0), apartment.getId());
+                if (verbose) {
+                    System.out.println("[TELEGRAM] Відправляємо 1 фото для квартири " + apartment.getId());
+                }
+                result = sendMessageWithPhoto(chatId, message, photos.get(0), apartment.getId());
             } else if (photos.size() > 1) {
-                return sendMediaGroup(chatId, message, photos, apartment.getId());
+                if (verbose) {
+                    System.out.println("[TELEGRAM] Відправляємо " + photos.size() + " фото для квартири " + apartment.getId());
+                }
+                result = sendMediaGroup(chatId, message, photos, apartment.getId());
+            } else {
+                if (verbose) {
+                    System.out.println("[TELEGRAM] Немає фото для квартири " + apartment.getId());
+                }
             }
-            return false;
+            
+            if (verbose) {
+                System.out.println("[TELEGRAM] Результат відправки квартири " + apartment.getId() + ": " + (result ? "УСПІШНО" : "НЕ ВДАЛОСЯ"));
+            }
+            return result;
         } catch (Exception e) {
-            logWarn("[TELEGRAM] Помилка відправки квартири " + apartment.getId() + ": " + e.getMessage());
+            logWarn("[TELEGRAM] Помилка відправки квартири " + apartment.getId() + " в канал " + chatId + ": " + e.getMessage());
+            if (verbose) {
+                System.out.println("[TELEGRAM] Деталі помилки: " + e.getClass().getSimpleName() + " - " + e.getMessage());
+                e.printStackTrace();
+            }
             return false;
         }
     }
@@ -111,7 +144,13 @@ public class TelegramService {
         try {
             java.io.File photoFile = new java.io.File(photoPath);
             if (!photoFile.exists()) {
+                if (verbose) {
+                    System.out.println("[TELEGRAM] Файл фото не існує: " + photoPath);
+                }
                 return false;
+            }
+            if (verbose) {
+                System.out.println("[TELEGRAM] Файл фото знайдено: " + photoPath + " (розмір: " + photoFile.length() + " байт)");
             }
             
             String url = String.format("https://api.telegram.org/bot%s/sendPhoto", botToken);
@@ -170,10 +209,17 @@ public class TelegramService {
             
             if (responseCode == 200) {
                 org.json.JSONObject responseJson = new org.json.JSONObject(response.toString());
-                return responseJson.optBoolean("ok", false);
+                boolean success = responseJson.optBoolean("ok", false);
+                if (verbose) {
+                    System.out.println("[TELEGRAM] Відповідь API для квартири " + apartmentId + ": " + response.toString());
+                }
+                return success;
             } else {
                 String errorResponse = response.toString();
-                logWarn("[TELEGRAM] Помилка відправки фото для квартири " + apartmentId + " (код " + responseCode + "): " + errorResponse);
+                logWarn("[TELEGRAM] Помилка відправки фото для квартири " + apartmentId + " в канал " + chatId + " (код " + responseCode + "): " + errorResponse);
+                if (verbose) {
+                    System.out.println("[TELEGRAM] Деталі помилки HTTP " + responseCode + ": " + errorResponse);
+                }
                 return false;
             }
             
@@ -208,17 +254,65 @@ public class TelegramService {
         }
     }
     
+    public boolean testChannelAccess(String chatId) {
+        try {
+            String url = String.format("https://api.telegram.org/bot%s/getChat", botToken);
+            org.json.JSONObject requestBody = new org.json.JSONObject();
+            requestBody.put("chat_id", chatId);
+            
+            String response = Jsoup.connect(url)
+                    .ignoreContentType(true)
+                    .requestBody(requestBody.toString())
+                    .header("Content-Type", "application/json")
+                    .post()
+                    .body()
+                    .text();
+            
+            org.json.JSONObject responseJson = new org.json.JSONObject(response);
+            boolean success = responseJson.getBoolean("ok");
+            
+            if (success && verbose) {
+                org.json.JSONObject chat = responseJson.getJSONObject("result");
+                System.out.println("[TELEGRAM] Доступ до каналу " + chatId + " підтверджено: " + chat.getString("title"));
+            } else if (verbose) {
+                System.out.println("[TELEGRAM] Немає доступу до каналу " + chatId + ": " + response);
+            }
+            
+            return success;
+        } catch (Exception e) {
+            if (verbose) {
+                System.out.println("[TELEGRAM] Помилка тестування каналу " + chatId + ": " + e.getMessage());
+            }
+            return false;
+        }
+    }
+    
     private boolean sendMediaGroup(String chatId, String message, java.util.List<String> photoPaths, int apartmentId) {
         try {
+            if (verbose) {
+                System.out.println("[TELEGRAM] Початок відправки MediaGroup для квартири " + apartmentId + " в канал " + chatId);
+                System.out.println("[TELEGRAM] Кількість фото: " + photoPaths.size());
+            }
+            
             java.util.List<java.io.File> photoFiles = new java.util.ArrayList<>();
             for (String path : photoPaths) {
                 java.io.File f = new java.io.File(path);
                 if (f.exists()) {
                     photoFiles.add(f);
+                    if (verbose) {
+                        System.out.println("[TELEGRAM] Файл знайдено: " + path + " (" + f.length() + " байт)");
+                    }
+                } else {
+                    if (verbose) {
+                        System.out.println("[TELEGRAM] Файл не знайдено: " + path);
+                    }
                 }
             }
             
             if (photoFiles.size() < 2) {
+                if (verbose) {
+                    System.out.println("[TELEGRAM] Недостатньо файлів для MediaGroup: " + photoFiles.size());
+                }
                 return false;
             }
             
@@ -291,12 +385,22 @@ public class TelegramService {
             
             if (responseCode == 200) {
                 org.json.JSONObject responseJson = new org.json.JSONObject(response.toString());
-                return responseJson.optBoolean("ok", false);
+                boolean success = responseJson.optBoolean("ok", false);
+                if (verbose) {
+                    System.out.println("[TELEGRAM] MediaGroup відповідь для квартири " + apartmentId + ": " + response.toString());
+                }
+                return success;
             } else {
+                if (verbose) {
+                    System.out.println("[TELEGRAM] MediaGroup помилка HTTP " + responseCode + " для квартири " + apartmentId + ": " + response.toString());
+                }
                 return false;
             }
             
         } catch (Exception e) {
+            if (verbose) {
+                System.out.println("[TELEGRAM] MediaGroup виняток для квартири " + apartmentId + ": " + e.getMessage());
+            }
             return false;
         }
     }

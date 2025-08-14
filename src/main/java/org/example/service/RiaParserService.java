@@ -8,7 +8,9 @@ import org.jsoup.Jsoup;
 import org.json.*;
 import org.openqa.selenium.By;
 import org.openqa.selenium.JavascriptExecutor;
+import org.openqa.selenium.Keys;
 import org.openqa.selenium.WebElement;
+import org.openqa.selenium.interactions.Actions;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chrome.ChromeOptions;
 import org.openqa.selenium.devtools.DevTools;
@@ -56,12 +58,18 @@ public class RiaParserService {
                 AppConfig.getMaxPhotosPerApartment()
             );
         }
+        
+        // Виводимо статистику після ранкового парсингу
+        System.out.println("\n📊 СТАТИСТИКА ПІСЛЯ РАНКОВОГО ПАРСИНГУ:");
+        databaseManager.printStatisticsForAllCities();
     }
 
     // Звичайний парсинг протягом дня — без очищення
     public void parseApartmentsForAllCities() {
+        System.out.println("Починаємо парсинг для " + org.example.config.CityConfig.getCities().size() + " міст...");
+        
         for (org.example.config.CityConfig.City city : org.example.config.CityConfig.getCities()) {
-            System.out.println("Парсинг міста: " + city.name + " (cityId=" + city.cityId + ", таблиця: " + city.dbTable + ", годин: " + city.hours + ")");
+            System.out.println("\n🔍 Парсинг міста: " + city.name + " (cityId=" + city.cityId + ", таблиця: " + city.dbTable + ", годин: " + city.hours + ")");
             parseApartments(
                 city.dbTable,
                 city.cityId,
@@ -74,12 +82,23 @@ public class RiaParserService {
                 AppConfig.getMinArea(),
                 AppConfig.getMaxPhotosPerApartment()
             );
+            System.out.println("✅ Парсинг міста " + city.name + " завершено");
         }
+        
+        // Виводимо статистику після звичайного парсингу
+        System.out.println("\n📊 СТАТИСТИКА ПІСЛЯ ПАРСИНГУ:");
+        databaseManager.printStatisticsForAllCities();
     }
     
     public void parseApartments(String tableName, int regionId, Integer cityId, 
                                int realtyType, int operationType, int hoursLimit, 
                                int maxPages, int minRooms, double minArea, int maxPhotos) {
+        
+        System.out.println("📋 Параметри парсингу:");
+        System.out.println("   Таблиця: " + tableName);
+        System.out.println("   Регіон: " + regionId + ", Місто: " + (cityId != null ? cityId : "всі"));
+        System.out.println("   Макс. сторінок: " + maxPages + ", Макс. фото: " + maxPhotos);
+        System.out.println("   Фільтри: " + minRooms + "+ кімнат, " + minArea + "+ м², " + hoursLimit + " годин");
         
         databaseManager.createTable(tableName);
         
@@ -87,19 +106,23 @@ public class RiaParserService {
         
         ChromeDriver driver = null;
         try {
+            System.out.println("🚀 Запуск ChromeDriver...");
             driver = setupDriver();
             DevTools devTools = setupDevTools(driver);
             String[] hashHolder = setupHashListener(devTools);
             String[] phoneHolder = new String[1];
             
             setupPhotoInterceptor(devTools);
+            System.out.println("✅ ChromeDriver готовий до роботи");
             
             ParserStats stats = new ParserStats();
             
             for (int page = 0; page < maxPages; page++) {
+                System.out.println("📄 Обробка сторінки " + (page + 1) + " з " + maxPages);
                 if (!parsePage(tableName, page, regionId, cityId, realtyType, operationType, 
                              hoursLimit, minRooms, minArea, maxPhotos, driver, formatter, 
                              hashHolder, phoneHolder, stats)) {
+                    System.out.println("⏹ Зупинка парсингу (більше сторінок немає)");
                     break;
                 }
                 
@@ -114,13 +137,15 @@ public class RiaParserService {
                 }
             }
             
+            System.out.println("📊 Результати парсингу:");
             stats.printSummary(hoursLimit);
             
         } catch (Exception e) {
-            System.err.println("Критична помилка при парсингу: " + e.getMessage());
+            System.err.println("❌ Критична помилка при парсингу: " + e.getMessage());
             e.printStackTrace();
         } finally {
             if (driver != null) {
+                System.out.println("🔒 Закриття ChromeDriver...");
                 driver.quit();
             }
         }
@@ -136,9 +161,10 @@ public class RiaParserService {
             String url = buildSearchUrl(page, regionId, cityId, realtyType, operationType);
             
             if (verbose) {
-                System.out.println("\nСторінка " + page + ": " + url);
+                System.out.println("🔗 URL: " + url);
             }
             
+            System.out.println("📡 Отримання даних з API...");
             Connection.Response response = Jsoup.connect(url)
                     .ignoreContentType(true)
                     .userAgent("Mozilla/5.0")
@@ -149,17 +175,20 @@ public class RiaParserService {
             JSONArray items = searchResult.optJSONArray("items");
             
             if (items == null || items.isEmpty()) {
-                if (verbose) System.out.println("Більше оголошень немає");
+                System.out.println("📭 На сторінці " + (page + 1) + " оголошень не знайдено");
                 return false;
             }
             
+            System.out.println("📋 Знайдено " + items.length() + " оголошень на сторінці " + (page + 1));
             stats.totalFound += items.length();
             
+            int processedCount = 0;
             for (int i = 0; i < items.length(); i++) {
                 int id = items.getInt(i);
                 if (processApartment(tableName, id, driver, formatter, hashHolder, 
                                    phoneHolder, hoursLimit, stats, minRooms, minArea, maxPhotos)) {
                     stats.shown++;
+                    processedCount++;
                 }
                 
                 // Мінімальна затримка між обробкою квартир
@@ -171,10 +200,11 @@ public class RiaParserService {
                 }
             }
             
+            System.out.println("✅ Оброблено " + processedCount + " з " + items.length() + " оголошень на сторінці " + (page + 1));
             return true;
             
         } catch (Exception e) {
-            System.err.println("Помилка при парсингу сторінки " + page + ": " + e.getMessage());
+            System.err.println("❌ Помилка при парсингу сторінки " + (page + 1) + ": " + e.getMessage());
             return false;
         }
     }
@@ -318,50 +348,236 @@ public class RiaParserService {
             String fullUrl = "https://dom.ria.com/uk/" + beautifulUrl;
             driver.get(fullUrl);
             
+            // Очищаємо попередні перехоплені фото
+            interceptedFxPhotos.clear();
+            
             // Натискаємо "Дивитися всі фото"
             try {
                 WebElement showAllPhotosButton = driver.findElement(By.cssSelector("li[class*='photo-'] span.all-photos"));
                 ((JavascriptExecutor) driver).executeScript("arguments[0].click();", showAllPhotosButton);
                 if (verbose) System.out.println("🖼 Натиснуто 'Дивитися всі фото'");
+                Thread.sleep(500); // Даємо час для завантаження галереї
             } catch (Exception e) {
                 if (verbose) System.out.println("⚠️ Кнопка 'Дивитися всі фото' не знайдена");
             }
             
-            // Прокручуємо фотографії для отримання 5 фото
-            for (int i = 0; i < 5; i++) { // Повернуто до 5 прокруток
+            // Прокручуємо фотографії для отримання 10 фото з покращеною логікою
+            int photosFound = 0;
+            int maxAttempts = 25; // Збільшено для більшої надійності
+            int consecutiveFailures = 0; // Лічильник послідовних невдач
+            int lastPhotoCount = 0; // Кількість фото на попередній ітерації
+            
+            // Спочатку чекаємо завантаження початкової галереї
+            Thread.sleep(1000);
+            
+            for (int attempt = 0; attempt < maxAttempts && photosFound < maxPhotos && consecutiveFailures < 5; attempt++) {
                 try {
-                    WebElement nextButton = driver.findElement(By.cssSelector("button.rotate-btn.rotate-arr-r"));
-                    ((JavascriptExecutor) driver).executeScript("arguments[0].click();", nextButton);
-                    Thread.sleep(200); // Залишаємо швидку затримку
+                    // Перевіряємо скільки фото вже перехоплено
+                    int currentPhotos = interceptedFxPhotos.size();
+                    
+                    // Спробуємо різні селектори для кнопки "наступне фото"
+                    WebElement nextButton = null;
+                    try {
+                        nextButton = driver.findElement(By.cssSelector("button.rotate-btn.rotate-arr-r"));
+                    } catch (Exception e1) {
+                        try {
+                            nextButton = driver.findElement(By.cssSelector("button[class*='rotate'][class*='arr-r']"));
+                        } catch (Exception e2) {
+                            try {
+                                nextButton = driver.findElement(By.cssSelector("button[aria-label*='наступн']"));
+                            } catch (Exception e3) {
+                                // Спробуємо знайти за текстом
+                                List<WebElement> buttons = driver.findElements(By.tagName("button"));
+                                for (WebElement btn : buttons) {
+                                    if (btn.getText().contains("→") || btn.getAttribute("aria-label") != null && 
+                                        btn.getAttribute("aria-label").contains("наступн")) {
+                                        nextButton = btn;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    if (nextButton != null && nextButton.isEnabled()) {
+                        // Натискаємо кнопку "наступне фото"
+                        ((JavascriptExecutor) driver).executeScript("arguments[0].click();", nextButton);
+                        
+                        // Чекаємо завантаження нового фото
+                        Thread.sleep(600);
+                        
+                        // Перевіряємо чи додалося нове фото
+                        if (interceptedFxPhotos.size() > currentPhotos) {
+                            photosFound = interceptedFxPhotos.size();
+                            consecutiveFailures = 0; // Скидаємо лічильник невдач
+                            if (verbose) System.out.println("📸 Знайдено фото: " + photosFound + " (спроба " + (attempt + 1) + ")");
+                        } else {
+                            consecutiveFailures++;
+                            if (verbose) System.out.println("⏳ Фото не знайдено, спроба " + (attempt + 1) + " (невдач підряд: " + consecutiveFailures + ")");
+                        }
+                    } else {
+                        consecutiveFailures++;
+                        if (verbose) System.out.println("⚠️ Кнопка 'наступне фото' не знайдена або неактивна");
+                    }
+                    
                 } catch (Exception e) {
-                    break;
+                    consecutiveFailures++;
+                    if (verbose) System.out.println("⚠️ Помилка на спробі " + (attempt + 1) + ": " + e.getMessage());
+                    
+                    // Якщо багато помилок підряд, зупиняємося
+                    if (consecutiveFailures >= 5) {
+                        if (verbose) System.out.println("🏁 Зупинка через багато помилок підряд");
+                        break;
+                    }
                 }
             }
             
-            Thread.sleep(800); // Зменшено з 1500 до 800 мс
+            // Додаткове очікування для завершення завантаження
+            Thread.sleep(500);
+            
+            if (verbose) {
+                System.out.println("📊 Перехоплено фото: " + interceptedFxPhotos.size());
+                System.out.println("🎯 Ціль: " + maxPhotos + " фото");
+            }
+            
+            // Якщо знайдено мало фото, спробуємо ще раз з різними підходами
+            if (interceptedFxPhotos.size() < 5 && maxPhotos > 5) {
+                if (verbose) System.out.println("🔄 Мало фото знайдено (" + interceptedFxPhotos.size() + "), спробуємо альтернативні методи...");
+                
+                // Спроба 1: Прокрутка клавішами
+                try {
+                    if (verbose) System.out.println("⌨️ Спроба прокрутки клавішами...");
+                    for (int keyAttempt = 0; keyAttempt < 10; keyAttempt++) {
+                        int currentPhotos = interceptedFxPhotos.size();
+                        driver.findElement(By.tagName("body")).sendKeys(Keys.ARROW_RIGHT);
+                        Thread.sleep(400);
+                        
+                        if (interceptedFxPhotos.size() > currentPhotos) {
+                            if (verbose) System.out.println("📸 Клавішами знайдено фото: " + interceptedFxPhotos.size());
+                        }
+                    }
+                } catch (Exception e) {
+                    if (verbose) System.out.println("⚠️ Помилка прокрутки клавішами: " + e.getMessage());
+                }
+                
+                // Спроба 2: Прокрутка мишею
+                try {
+                    if (verbose) System.out.println("🖱️ Спроба прокрутки мишею...");
+                    WebElement gallery = driver.findElement(By.cssSelector(".gallery-container, .photo-gallery, [class*='gallery']"));
+                    Actions actions = new Actions(driver);
+                    
+                    for (int mouseAttempt = 0; mouseAttempt < 8; mouseAttempt++) {
+                        int currentPhotos = interceptedFxPhotos.size();
+                        actions.moveToElement(gallery).click().sendKeys(Keys.ARROW_RIGHT).perform();
+                        Thread.sleep(500);
+                        
+                        if (interceptedFxPhotos.size() > currentPhotos) {
+                            if (verbose) System.out.println("📸 Мишею знайдено фото: " + interceptedFxPhotos.size());
+                        }
+                    }
+                } catch (Exception e) {
+                    if (verbose) System.out.println("⚠️ Помилка прокрутки мишею: " + e.getMessage());
+                }
+            }
             
             // Завантажуємо фотографії
             int counter = 1;
             for (String photoUrl : interceptedFxPhotos) {
-                String photoFileName = photosDirectory + "/" + apartment.getId() + "_net_" + counter + ".webp";
+                if (counter > maxPhotos) break;
+                
+                // Визначаємо якість з URL для назви файлу
+                String quality = "unknown";
+                if (photoUrl.endsWith("fx.webp")) quality = "fx";
+                else if (photoUrl.endsWith("lg.webp")) quality = "lg";
+                else if (photoUrl.endsWith("md.webp")) quality = "md";
+                else if (photoUrl.endsWith("sm.webp")) quality = "sm";
+                else if (photoUrl.endsWith("xs.webp")) quality = "xs";
+                else if (photoUrl.endsWith("thumb.webp")) quality = "thumb";
+                
+                // Зберігаємо в кращому форматі - JPG замість WebP
+                String photoFileName = photosDirectory + "/" + apartment.getId() + "_" + quality + "_" + counter + ".jpg";
                 
                 try (InputStream in = new URL(photoUrl).openStream()) {
                     Files.createDirectories(Paths.get(photosDirectory));
                     Files.copy(in, Paths.get(photoFileName), StandardCopyOption.REPLACE_EXISTING);
                     apartment.addPhotoPath(photoFileName);
                     counter++;
-                    if (apartment.getPhotoPaths().size() >= maxPhotos) break;
+                    if (verbose) {
+                        System.out.println("💾 Збережено фото " + counter + " якості " + quality);
+                    }
                 } catch (IOException e) {
                     if (verbose) {
                         System.err.println("⚠️ Помилка завантаження фото " + photoUrl + ": " + e.getMessage());
                     }
                 }
             }
+            
+            if (verbose) {
+                System.out.println("💾 Збережено фото: " + (counter - 1));
+            }
+            
+            // Якщо браузерний спосіб не дав результатів, спробуємо через API
+            if (apartment.getPhotoPaths().isEmpty() && !beautifulUrl.isEmpty()) {
+                try {
+                    downloadPhotosViaAPI(apartment, data, maxPhotos);
+                    if (verbose) {
+                        System.out.println("🔄 Спробовано завантажити фото через API");
+                    }
+                } catch (Exception e) {
+                    if (verbose) {
+                        System.err.println("⚠️ Помилка завантаження фото через API: " + e.getMessage());
+                    }
+                }
+            }
+            
             interceptedFxPhotos.clear();
             
         } catch (Exception e) {
             if (verbose) {
                 System.err.println("❌ Помилка завантаження фотографій: " + e.getMessage());
+            }
+        }
+    }
+    
+    private void downloadPhotosViaAPI(Apartment apartment, JSONObject data, int maxPhotos) {
+        try {
+            // Отримуємо фото через API
+            JSONArray photos = data.optJSONArray("photos");
+            if (photos != null && photos.length() > 0) {
+                int counter = 1;
+                for (int i = 0; i < Math.min(photos.length(), maxPhotos); i++) {
+                    try {
+                        JSONObject photo = photos.getJSONObject(i);
+                        String photoUrl = photo.optString("url");
+                        
+                        if (!photoUrl.isEmpty()) {
+                            String photoFileName = photosDirectory + "/" + apartment.getId() + "_api_" + counter + ".jpg";
+                            
+                            try (InputStream in = new URL(photoUrl).openStream()) {
+                                Files.createDirectories(Paths.get(photosDirectory));
+                                Files.copy(in, Paths.get(photoFileName), StandardCopyOption.REPLACE_EXISTING);
+                                apartment.addPhotoPath(photoFileName);
+                                counter++;
+                            } catch (IOException e) {
+                                if (verbose) {
+                                    System.err.println("⚠️ Помилка завантаження API фото " + photoUrl + ": " + e.getMessage());
+                                }
+                            }
+                        }
+                    } catch (Exception e) {
+                        if (verbose) {
+                            System.err.println("⚠️ Помилка обробки API фото " + i + ": " + e.getMessage());
+                        }
+                    }
+                }
+                
+                if (verbose) {
+                    System.out.println("📸 Завантажено " + (counter - 1) + " фото через API");
+                }
+            }
+        } catch (Exception e) {
+            if (verbose) {
+                System.err.println("❌ Помилка завантаження фото через API: " + e.getMessage());
             }
         }
     }
@@ -403,10 +619,77 @@ public class RiaParserService {
     private void setupPhotoInterceptor(DevTools devTools) {
         devTools.addListener(Network.requestWillBeSent(), request -> {
             String url = request.getRequest().getUrl();
-            if (url.endsWith("fx.webp") && url.contains("photosnew/dom/photo/")) {
-                interceptedFxPhotos.add(url);
+            // Фільтр для фото з різними варіантами якості
+            if (url.contains("photosnew/dom/photo/") && 
+                (url.endsWith("fx.webp") || url.endsWith("lg.webp") || url.endsWith("md.webp") || 
+                 url.endsWith("sm.webp") || url.endsWith("xs.webp") || url.endsWith("thumb.webp"))) {
+                
+                // Видаляємо параметри з URL для унікальності
+                String cleanUrl = url.split("\\?")[0];
+                
+                // Визначаємо якість фото з URL
+                String quality = "unknown";
+                if (url.endsWith("fx.webp")) quality = "fx";
+                else if (url.endsWith("lg.webp")) quality = "lg";
+                else if (url.endsWith("md.webp")) quality = "md";
+                else if (url.endsWith("sm.webp")) quality = "sm";
+                else if (url.endsWith("xs.webp")) quality = "xs";
+                else if (url.endsWith("thumb.webp")) quality = "thumb";
+                
+                // Перевіряємо чи це не дублікат за базовим URL
+                boolean isDuplicate = false;
+                String baseUrl = cleanUrl.replaceAll("_(fx|lg|md|sm|xs|thumb)\\.webp$", "");
+                
+                for (String existingUrl : interceptedFxPhotos) {
+                    String existingCleanUrl = existingUrl.split("\\?")[0];
+                    String existingBaseUrl = existingCleanUrl.replaceAll("_(fx|lg|md|sm|xs|thumb)\\.webp$", "");
+                    if (existingBaseUrl.equals(baseUrl)) {
+                        // Якщо знайдено дублікат, замінюємо на кращу якість
+                        String existingQuality = "unknown";
+                        if (existingCleanUrl.endsWith("fx.webp")) existingQuality = "fx";
+                        else if (existingCleanUrl.endsWith("lg.webp")) existingQuality = "lg";
+                        else if (existingCleanUrl.endsWith("md.webp")) existingQuality = "md";
+                        else if (existingCleanUrl.endsWith("sm.webp")) existingQuality = "sm";
+                        else if (existingCleanUrl.endsWith("xs.webp")) existingQuality = "xs";
+                        else if (existingCleanUrl.endsWith("thumb.webp")) existingQuality = "thumb";
+                        
+                        // Порівнюємо якість (fx > lg > md > sm > xs > thumb)
+                        if (isBetterQuality(quality, existingQuality)) {
+                            interceptedFxPhotos.remove(existingUrl);
+                            interceptedFxPhotos.add(url);
+                            if (verbose) {
+                                System.out.println("🔄 Замінено на кращу якість: " + quality + " (було: " + existingQuality + ")");
+                            }
+                        }
+                        isDuplicate = true;
+                        break;
+                    }
+                }
+                
+                if (!isDuplicate) {
+                    interceptedFxPhotos.add(url);
+                    if (verbose) {
+                        System.out.println("📸 Перехоплено фото якості " + quality + ": " + cleanUrl.substring(cleanUrl.lastIndexOf("/") + 1));
+                    }
+                }
             }
         });
+    }
+    
+    private boolean isBetterQuality(String newQuality, String existingQuality) {
+        // Порядок якості від найкращої до найгіршої
+        String[] qualityOrder = {"fx", "lg", "md", "sm", "xs", "thumb"};
+        
+        int newIndex = -1;
+        int existingIndex = -1;
+        
+        for (int i = 0; i < qualityOrder.length; i++) {
+            if (qualityOrder[i].equals(newQuality)) newIndex = i;
+            if (qualityOrder[i].equals(existingQuality)) existingIndex = i;
+        }
+        
+        // Менший індекс = краща якість
+        return newIndex >= 0 && existingIndex >= 0 && newIndex < existingIndex;
     }
     
     private ChromeDriver setupDriver() {

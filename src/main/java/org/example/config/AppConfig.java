@@ -20,7 +20,7 @@ public class AppConfig {
         properties.setProperty("database.url", "jdbc:sqlite:test.db");
         properties.setProperty("table.name", "apartments");
         properties.setProperty("photos.directory", "photos");
-        properties.setProperty("max.photos.per.apartment", "5");
+        properties.setProperty("max.photos.per.apartment", "10");
         properties.setProperty("hours.limit", "48");
         properties.setProperty("max.pages", "2");
         properties.setProperty("min.rooms", "1");

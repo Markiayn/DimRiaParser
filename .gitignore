@@ -51,3 +51,7 @@ photos/
 
 # Ігнорувати збірку Maven
 target/
+
+test.db
+
+logs/

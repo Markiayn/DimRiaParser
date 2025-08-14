@@ -6,6 +6,7 @@ import org.example.scheduler.AutoPostingScheduler;
 import org.example.service.PostingService;
 import org.example.service.RiaParserService;
 
+import java.util.List;
 import java.util.Scanner;
 
 public class Main {
@@ -15,6 +16,16 @@ public class Main {
         System.out.println("================================================");
         
         if (!validateConfiguration()) {
+            System.exit(1);
+        }
+        
+        // Перевіряємо завантаження міст
+        System.out.println("Перевірка завантаження міст...");
+        List<org.example.config.CityConfig.City> cities = org.example.config.CityConfig.getCities();
+        System.out.println("Завантажено міст: " + cities.size());
+        if (cities.isEmpty()) {
+            System.err.println("ПОМИЛКА: Не знайдено жодного міста в конфігурації!");
+            System.err.println("Перевірте файл config.properties");
             System.exit(1);
         }
         
@@ -57,11 +68,16 @@ public class Main {
         
         DatabaseManager dbManager = DatabaseManager.getInstance();
         
-        for (org.example.config.CityConfig.City city : org.example.config.CityConfig.getCities()) {
+        List<org.example.config.CityConfig.City> cities = org.example.config.CityConfig.getCities();
+        System.out.println("Знайдено " + cities.size() + " міст для ініціалізації БД");
+        
+        for (org.example.config.CityConfig.City city : cities) {
+            System.out.println("Створення таблиці для міста: " + city.name + " (" + city.dbTable + ")");
             dbManager.createTable(city.dbTable);
         }
         
         System.out.println("База даних ініціалізована");
+        System.out.println("Підтримка 10 фото на оголошення активована");
     }
     
     private static void handleCommandLineArgs(String[] args) {
@@ -171,11 +187,20 @@ public class Main {
     private static void runParsing() {
         System.out.println("\nПочинаємо парсинг...");
         try {
+            List<org.example.config.CityConfig.City> cities = org.example.config.CityConfig.getCities();
+            System.out.println("Кількість міст для парсингу: " + cities.size());
+            
+            if (cities.isEmpty()) {
+                System.err.println("ПОМИЛКА: Немає міст для парсингу!");
+                return;
+            }
+            
             RiaParserService parser = new RiaParserService();
             parser.parseApartmentsForAllCities();
             System.out.println("Парсинг завершено!");
         } catch (Exception e) {
             System.err.println("Помилка парсингу: " + e.getMessage());
+            e.printStackTrace();
         }
     }
     
