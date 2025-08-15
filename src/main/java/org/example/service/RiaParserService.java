@@ -33,14 +33,28 @@ public class RiaParserService {
     private final String photosDirectory;
     private final boolean verbose;
     
+    // Кеш для зберігання ID квартир, які вже перевірені на існування
+    private final Set<Integer> checkedApartmentIds = Collections.synchronizedSet(new HashSet<>());
+    
     public RiaParserService() {
         this.databaseManager = DatabaseManager.getInstance();
         this.photosDirectory = AppConfig.getPhotosDirectory();
         this.verbose = AppConfig.isVerbose();
     }
     
+    /**
+     * Очищує кеш перевірених ID квартир
+     */
+    public void clearCache() {
+        checkedApartmentIds.clear();
+        System.out.println("🧹 Кеш перевірених квартир очищено");
+    }
+    
     // Новий метод для ранкового парсингу з очищенням
     public void parseApartmentsForAllCitiesMorning() {
+        // Очищуємо кеш перевірених квартир перед ранковим парсингом
+        clearCache();
+        
         org.example.utils.FileUtils.deleteAllPhotos(photosDirectory);
         for (org.example.config.CityConfig.City city : org.example.config.CityConfig.getCities()) {
             databaseManager.clearTable(city.dbTable);
@@ -66,6 +80,9 @@ public class RiaParserService {
 
     // Звичайний парсинг протягом дня — без очищення
     public void parseApartmentsForAllCities() {
+        // Очищуємо кеш перевірених квартир перед парсингом
+        clearCache();
+        
         System.out.println("Починаємо парсинг для " + org.example.config.CityConfig.getCities().size() + " міст...");
         
         for (org.example.config.CityConfig.City city : org.example.config.CityConfig.getCities()) {
@@ -93,6 +110,9 @@ public class RiaParserService {
     public void parseApartments(String tableName, int regionId, Integer cityId, 
                                int realtyType, int operationType, int hoursLimit, 
                                int maxPages, int minRooms, double minArea, int maxPhotos) {
+        
+        // Очищуємо кеш перевірених квартир для кожного міста
+        checkedApartmentIds.clear();
         
         System.out.println("📋 Параметри парсингу:");
         System.out.println("   Таблиця: " + tableName);
@@ -231,6 +251,26 @@ public class RiaParserService {
                                    String[] phoneHolder, int hoursLimit, ParserStats stats,
                                    int minRooms, double minArea, int maxPhotos) {
         try {
+            // Перевіряємо чи вже перевіряли цю квартиру в поточній сесії
+            if (checkedApartmentIds.contains(id)) {
+                if (verbose) {
+                    System.out.println("⏭️ Квартира " + id + " вже перевірена в поточній сесії");
+                }
+                return false;
+            }
+            
+            // Додаємо ID до кешу перевірених
+            checkedApartmentIds.add(id);
+            
+            // Перевіряємо чи квартира вже існує в базі даних
+            if (databaseManager.apartmentExists(tableName, id)) {
+                if (verbose) {
+                    System.out.println("⏭️ Квартира " + id + " вже існує в базі даних");
+                }
+                stats.skippedAlreadyExists++;
+                return false;
+            }
+            
             // Отримуємо дані квартири
             JSONObject data = fetchApartmentData(id);
             if (data == null) return false;
@@ -742,6 +782,7 @@ public class RiaParserService {
         int filteredTooOld = 0;
         int filteredNoUrl = 0;
         int totalFound = 0;
+        int skippedAlreadyExists = 0; // Додано для відстеження пропущених через вже існуючі
         
         void printSummary(int hoursLimit) {
             System.out.println("\n✅ Завершено. Виведено квартир: " + shown);
@@ -749,6 +790,7 @@ public class RiaParserService {
             System.out.println("⏱ Відсіяно через дату (пусту): " + filteredEmptyDate);
             System.out.println("⏰ Відсіяно через дату (>" + hoursLimit + " год): " + filteredTooOld);
             System.out.println("🚫 Відсіяно через відсутність URL: " + filteredNoUrl);
+            System.out.println("⏭️ Пропущено через вже існуючі: " + skippedAlreadyExists);
         }
     }
 } 

@@ -12,20 +12,20 @@ import java.util.Scanner;
 public class Main {
 
     public static void main(String[] args) {
-        System.out.println("DimRiaParser - Парсер оголошень з dom.ria.com");
-        System.out.println("================================================");
+        System.out.println("🏠 DimRiaParser - Парсер оголошень з dom.ria.com");
+        System.out.println("=".repeat(60));
         
         if (!validateConfiguration()) {
             System.exit(1);
         }
         
         // Перевіряємо завантаження міст
-        System.out.println("Перевірка завантаження міст...");
+        System.out.println("🏙️  Перевірка завантаження міст...");
         List<org.example.config.CityConfig.City> cities = org.example.config.CityConfig.getCities();
-        System.out.println("Завантажено міст: " + cities.size());
+        System.out.println("✅ Завантажено міст: " + cities.size());
         if (cities.isEmpty()) {
-            System.err.println("ПОМИЛКА: Не знайдено жодного міста в конфігурації!");
-            System.err.println("Перевірте файл config.properties");
+            System.err.println("❌ ПОМИЛКА: Не знайдено жодного міста в конфігурації!");
+            System.err.println("❌ Перевірте файл config.properties");
             System.exit(1);
         }
         
@@ -40,11 +40,11 @@ public class Main {
     }
     
     private static boolean validateConfiguration() {
-        System.out.println("Перевірка конфігурації...");
+        System.out.println("⚙️  Перевірка конфігурації...");
         
         String chromeDriverPath = AppConfig.getChromeDriverPath();
         if (!new java.io.File(chromeDriverPath).exists()) {
-            System.err.println("ChromeDriver не знайдено: " + chromeDriverPath);
+            System.err.println("❌ ChromeDriver не знайдено: " + chromeDriverPath);
             return false;
         }
         
@@ -55,29 +55,29 @@ public class Main {
         if ("your_bot_token_here".equals(botToken) || 
             "your_chat_id1_here".equals(chatId1) || 
             "your_chat_id2_here".equals(chatId2)) {
-            System.err.println("Налаштування Telegram не завершено. Перевірте config.properties");
+            System.err.println("❌ Налаштування Telegram не завершено. Перевірте config.properties");
             return false;
         }
         
-        System.out.println("Конфігурація в порядку");
+        System.out.println("✅ Конфігурація в порядку");
         return true;
     }
     
     private static void initializeDatabase() {
-        System.out.println("Ініціалізація бази даних...");
+        System.out.println("🗄️  Ініціалізація бази даних...");
         
         DatabaseManager dbManager = DatabaseManager.getInstance();
         
         List<org.example.config.CityConfig.City> cities = org.example.config.CityConfig.getCities();
-        System.out.println("Знайдено " + cities.size() + " міст для ініціалізації БД");
+        System.out.println("🏙️  Знайдено " + cities.size() + " міст для ініціалізації БД");
         
         for (org.example.config.CityConfig.City city : cities) {
-            System.out.println("Створення таблиці для міста: " + city.name + " (" + city.dbTable + ")");
+            System.out.println("📋 Створення таблиці для міста: " + city.name + " (" + city.dbTable + ")");
             dbManager.createTable(city.dbTable);
         }
         
-        System.out.println("База даних ініціалізована");
-        System.out.println("Підтримка 10 фото на оголошення активована");
+        System.out.println("✅ База даних ініціалізована");
+        System.out.println("📸 Підтримка 10 фото на оголошення активована");
     }
     
     private static void handleCommandLineArgs(String[] args) {
@@ -85,19 +85,19 @@ public class Main {
         
         switch (command) {
             case "parse":
-                System.out.println("Запуск парсингу...");
+                System.out.println("🔍 Запуск парсингу...");
                 RiaParserService parser = new RiaParserService();
                 parser.parseApartmentsForAllCities();
                 break;
                 
             case "post":
-                System.out.println("Запуск постингу...");
+                System.out.println("📤 Запуск постингу...");
                 PostingService postingService = new PostingService();
                 postingService.postMorningApartmentsForAllCities(org.example.config.CityConfig.getCities());
                 break;
                 
             case "auto":
-                System.out.println("Запуск автоматичного режиму...");
+                System.out.println("🚀 Запуск автоматичного режиму (з 8:00)...");
                 AutoPostingScheduler scheduler = new AutoPostingScheduler();
                 scheduler.startScheduledPosting();
                 
@@ -111,7 +111,7 @@ public class Main {
                 break;
                 
             case "autonow":
-                System.out.println("Запуск автоматичного режиму з поточного моменту...");
+                System.out.println("⚡ Запуск автоматичного режиму (з поточного моменту)...");
                 AutoPostingScheduler schedulerNow = new AutoPostingScheduler();
                 schedulerNow.startScheduledPostingFromNow();
                 
@@ -125,13 +125,13 @@ public class Main {
                 break;
                 
             case "test":
-                System.out.println("Запуск тестового автоматичного режиму (швидкий цикл)...");
+                System.out.println("🧪 Запуск тестового автоматичного режиму (швидкий цикл)...");
                 AutoPostingScheduler testScheduler = new AutoPostingScheduler();
                 testScheduler.startTestScheduledPosting();
                 break;
                 
             default:
-                System.err.println("Невідома команда: " + command);
+                System.err.println("❌ Невідома команда: " + command);
                 printUsage();
                 break;
         }
@@ -141,13 +141,21 @@ public class Main {
         Scanner scanner = new Scanner(System.in);
         
         while (true) {
-            System.out.println("\nВиберіть опцію:");
-            System.out.println("1. Парсинг оголошень");
-            System.out.println("2. Постинг оголошень");
-            System.out.println("3. Автоматичний режим (з 8:00)");
-            System.out.println("4. Автоматичний режим (з поточного моменту)");
-            System.out.println("5. Вихід");
-            System.out.println("6. Тестовий автоматичний режим (швидкий цикл)");
+            System.out.println("\n" + "=".repeat(60));
+            System.out.println("🏠 DimRiaParser - Меню");
+            System.out.println("=".repeat(60));
+            System.out.println("1. 🔍 Парсинг оголошень (ручний)");
+            System.out.println("2. 📤 Постинг оголошень (ручний)");
+            System.out.println("3. 🚀 Автоматичний режим (з 8:00)");
+            System.out.println("4. ⚡ Автоматичний режим (з поточного моменту)");
+            System.out.println("5. 🧪 Тестовий автоматичний режим (швидкий цикл)");
+            System.out.println("6. ❌ Вихід");
+            System.out.println("=".repeat(60));
+            System.out.println("📅 Розклад автоматичного режиму:");
+            System.out.println("   🌅 8:00 - Очистка БД + Парсинг");
+            System.out.println("   🕙 10:00-22:00 - Щогодинний постинг + Допарсинг");
+            System.out.println("   🌙 22:00-8:00 - Очікування до наступного дня");
+            System.out.println("=".repeat(60));
             System.out.print("Ваш вибір: ");
             
             String choice = scanner.nextLine().trim();
@@ -170,54 +178,71 @@ public class Main {
                     break;
                     
                 case "5":
-                    System.out.println("До побачення!");
-                    return;
-                    
-                case "6":
                     runTestAutoMode();
                     break;
                     
+                case "6":
+                    System.out.println("👋 До побачення!");
+                    return;
+                    
                 default:
-                    System.out.println("Невірний вибір. Спробуйте ще раз.");
+                    System.out.println("❌ Невірний вибір. Спробуйте ще раз.");
                     break;
             }
         }
     }
     
     private static void runParsing() {
-        System.out.println("\nПочинаємо парсинг...");
+        System.out.println("\n" + "=".repeat(50));
+        System.out.println("🔍 ЗАПУСК ПАРСИНГУ ОГОЛОШЕНЬ");
+        System.out.println("=".repeat(50));
+        
         try {
             List<org.example.config.CityConfig.City> cities = org.example.config.CityConfig.getCities();
-            System.out.println("Кількість міст для парсингу: " + cities.size());
+            System.out.println("🏙️  Кількість міст для парсингу: " + cities.size());
             
             if (cities.isEmpty()) {
-                System.err.println("ПОМИЛКА: Немає міст для парсингу!");
+                System.err.println("❌ ПОМИЛКА: Немає міст для парсингу!");
                 return;
             }
             
+            System.out.println("🚀 Починаємо парсинг...");
             RiaParserService parser = new RiaParserService();
             parser.parseApartmentsForAllCities();
-            System.out.println("Парсинг завершено!");
+            System.out.println("✅ Парсинг завершено успішно!");
         } catch (Exception e) {
-            System.err.println("Помилка парсингу: " + e.getMessage());
+            System.err.println("❌ Помилка парсингу: " + e.getMessage());
             e.printStackTrace();
         }
     }
     
     private static void runPosting() {
-        System.out.println("\nПочинаємо постинг...");
+        System.out.println("\n" + "=".repeat(50));
+        System.out.println("📤 ЗАПУСК ПОСТИНГУ ОГОЛОШЕНЬ");
+        System.out.println("=".repeat(50));
+        
         try {
+            System.out.println("🚀 Починаємо постинг...");
             PostingService postingService = new PostingService();
             postingService.postMorningApartmentsForAllCities(org.example.config.CityConfig.getCities());
-            System.out.println("Постинг завершено");
+            System.out.println("✅ Постинг завершено успішно!");
         } catch (Exception e) {
-            System.err.println("Помилка постингу: " + e.getMessage());
+            System.err.println("❌ Помилка постингу: " + e.getMessage());
         }
     }
     
     private static void runAutoMode() {
-        System.out.println("\nЗапуск автоматичного режиму...");
-        System.out.println("Для зупинки натисніть Ctrl+C");
+        System.out.println("\n" + "=".repeat(60));
+        System.out.println("🚀 ЗАПУСК АВТОМАТИЧНОГО РЕЖИМУ (з 8:00)");
+        System.out.println("=".repeat(60));
+        System.out.println("📅 Розклад:");
+        System.out.println("   🌅 8:00 - Очистка БД + Парсинг");
+        System.out.println("   🕙 10:00-22:00 - Щогодинний постинг + Допарсинг");
+        System.out.println("   🌙 22:00-8:00 - Очікування до наступного дня");
+        System.out.println("=".repeat(60));
+        System.out.println("⚠️  Для зупинки натисніть Ctrl+C");
+        System.out.println("🔄 Програма працюватиме безперервно кожен день!");
+        System.out.println("=".repeat(60));
         
         AutoPostingScheduler scheduler = new AutoPostingScheduler();
         scheduler.startScheduledPosting();
@@ -232,8 +257,18 @@ public class Main {
     }
     
     private static void runAutoModeFromNow() {
-        System.out.println("\nЗапуск автоматичного режиму з поточного моменту...");
-        System.out.println("Для зупинки натисніть Ctrl+C");
+        System.out.println("\n" + "=".repeat(60));
+        System.out.println("⚡ ЗАПУСК АВТОМАТИЧНОГО РЕЖИМУ (з поточного моменту)");
+        System.out.println("=".repeat(60));
+        System.out.println("📅 Розклад:");
+        System.out.println("   🔍 Одразу - Парсинг поточних оголошень");
+        System.out.println("   🕙 10:00-22:00 - Щогодинний постинг + Допарсинг");
+        System.out.println("   🌙 22:00-8:00 - Очікування до наступного дня");
+        System.out.println("   🌅 8:00 - Очистка БД + Парсинг (наступний день)");
+        System.out.println("=".repeat(60));
+        System.out.println("⚠️  Для зупинки натисніть Ctrl+C");
+        System.out.println("🔄 Програма працюватиме безперервно кожен день!");
+        System.out.println("=".repeat(60));
         
         AutoPostingScheduler scheduler = new AutoPostingScheduler();
         scheduler.startScheduledPostingFromNow();
@@ -248,20 +283,43 @@ public class Main {
     }
     
     private static void runTestAutoMode() {
-        System.out.println("\nЗапуск тестового автоматичного режиму (швидкий цикл)...");
+        System.out.println("\n" + "=".repeat(60));
+        System.out.println("🧪 ЗАПУСК ТЕСТОВОГО АВТОМАТИЧНОГО РЕЖИМУ");
+        System.out.println("=".repeat(60));
+        System.out.println("📅 Тестовий розклад (швидкий цикл):");
+        System.out.println("   1️⃣  Очистка БД + Парсинг (як о 8:00)");
+        System.out.println("   2️⃣  3 ітерації: Постинг → Парсинг → 10 сек очікування");
+        System.out.println("   3️⃣  Тест завершено");
+        System.out.println("=".repeat(60));
+        System.out.println("ℹ️  Це тестовий режим для перевірки логіки");
+        System.out.println("=".repeat(60));
+        
         AutoPostingScheduler scheduler = new AutoPostingScheduler();
         scheduler.startTestScheduledPosting();
     }
     
     private static void printUsage() {
-        System.out.println("\nВикористання:");
+        System.out.println("\n" + "=".repeat(70));
+        System.out.println("🏠 DimRiaParser - Використання");
+        System.out.println("=".repeat(70));
+        System.out.println("Синтаксис:");
         System.out.println("  java -jar DimRiaParser.jar [команда]");
-        System.out.println("\nДоступні команди:");
-        System.out.println("  parse   - Парсинг оголошень");
-        System.out.println("  post    - Постинг оголошень");
-        System.out.println("  auto    - Автоматичний режим (з 8:00)");
-        System.out.println("  autonow - Автоматичний режим (з поточного моменту)");
-        System.out.println("  test    - Тестовий автоматичний режим (швидкий цикл)");
-        System.out.println("\nБез аргументів запускається інтерактивний режим");
+        System.out.println("\n📋 Доступні команди:");
+        System.out.println("  🔍 parse   - Парсинг оголошень (ручний)");
+        System.out.println("  📤 post    - Постинг оголошень (ручний)");
+        System.out.println("  🚀 auto    - Автоматичний режим (з 8:00)");
+        System.out.println("  ⚡ autonow - Автоматичний режим (з поточного моменту)");
+        System.out.println("  🧪 test    - Тестовий автоматичний режим (швидкий цикл)");
+        System.out.println("\n📅 Розклад автоматичного режиму:");
+        System.out.println("   🌅 8:00 - Очистка БД + Парсинг");
+        System.out.println("   🕙 10:00-22:00 - Щогодинний постинг + Допарсинг");
+        System.out.println("   🌙 22:00-8:00 - Очікування до наступного дня");
+        System.out.println("\n💡 Приклади:");
+        System.out.println("  java -jar DimRiaParser.jar parse    # Тільки парсинг");
+        System.out.println("  java -jar DimRiaParser.jar auto     # Автоматичний режим");
+        System.out.println("  java -jar DimRiaParser.jar          # Інтерактивне меню");
+        System.out.println("=".repeat(70));
+        System.out.println("ℹ️  Без аргументів запускається інтерактивне меню");
+        System.out.println("=".repeat(70));
     }
 }

@@ -405,6 +405,32 @@ public class DatabaseManager {
         return 0;
     }
     
+    /**
+     * Перевіряє чи існує квартира з вказаним ID в таблиці
+     * @param tableName назва таблиці
+     * @param apartmentId ID квартири
+     * @return true якщо квартира існує, false якщо ні
+     */
+    public boolean apartmentExists(String tableName, int apartmentId) {
+        String sql = String.format("SELECT COUNT(*) FROM %s WHERE ID = ?", tableName);
+        
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            
+            pstmt.setInt(1, apartmentId);
+            ResultSet rs = pstmt.executeQuery();
+            
+            if (rs.next()) {
+                return rs.getInt(1) > 0;
+            }
+            
+        } catch (SQLException e) {
+            System.err.println("Помилка перевірки існування квартири " + apartmentId + " в таблиці " + tableName + ": " + e.getMessage());
+        }
+        
+        return false;
+    }
+    
     public void printStatisticsForCity(String tableName, String cityName) {
         int total = getTotalApartmentsCount(tableName);
         int posted = getPostedApartmentsCount(tableName);

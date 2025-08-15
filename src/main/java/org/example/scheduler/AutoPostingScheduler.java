@@ -27,19 +27,19 @@ public class AutoPostingScheduler {
     }
     
     public void startScheduledPosting() {
-        System.out.println("=== ЗАПУСК АВТОМАТИЧНОГО РЕЖИМУ ===");
+        System.out.println("🚀 === ЗАПУСК АВТОМАТИЧНОГО РЕЖИМУ ===");
         System.out.println("Поточний час: " + LocalTime.now());
         System.out.println("Дата: " + java.time.LocalDate.now());
         
         if (!postingService.testTelegramConnection()) {
-            System.err.println("Помилка підключення до Telegram. Перевірте налаштування.");
+            System.err.println("❌ Помилка підключення до Telegram. Перевірте налаштування.");
             return;
         }
         
         long delayTo8AM = calculateDelayToTime(8, 0);
         long delayTo10AM = calculateDelayToTime(10, 0);
         
-        System.out.println("=== РОЗРАХУНОК ЗАТРИМОК ===");
+        System.out.println("⏰ === РОЗРАХУНОК ЗАТРИМОК ===");
         System.out.println("Поточний час: " + LocalTime.now());
         System.out.println("Затримка до парсингу (8:00): " + formatDelay(delayTo8AM));
         System.out.println("Затримка до щогодинного постингу (10:00): " + formatDelay(delayTo10AM));
@@ -53,18 +53,19 @@ public class AutoPostingScheduler {
         System.out.println("Наступний постинг заплановано на: " + nextPostingTime.format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm:ss")));
         
         // Ранковий парсинг о 8:00
-        System.out.println("=== ПЛАНУВАННЯ РАНКОВОГО ПАРСИНГУ ===");
+        System.out.println("🌅 === ПЛАНУВАННЯ РАНКОВОГО ПАРСИНГУ ===");
         scheduleNextMorningParsing(delayTo8AM);
         System.out.println("Ранковий парсинг заплановано на 8:00 щодня");
         
         // Щогодинний постинг з 10:00
-        System.out.println("=== ПЛАНУВАННЯ ЩОГОДИННОГО ПОСТИНГУ ===");
+        System.out.println("🕙 === ПЛАНУВАННЯ ЩОГОДИННОГО ПОСТИНГУ ===");
         scheduleNextHourlyPosting(delayTo10AM);
         System.out.println("Щогодинний постинг заплановано з 10:00 щогодини");
         
-        System.out.println("=== АВТОМАТИЧНИЙ РЕЖИМ ЗАПУЩЕНО ===");
-        System.out.println("Розклад: 8:00 - Парсинг нових оголошень; 10:00-22:00 - Щогодинний постинг");
-        System.out.println("Програма працюватиме безперервно кожен день!");
+        System.out.println("✅ === АВТОМАТИЧНИЙ РЕЖИМ ЗАПУЩЕНО ===");
+        System.out.println("📅 Розклад: 8:00 - Очистка БД + Парсинг; 10:00-22:00 - Щогодинний постинг + Допарсинг");
+        System.out.println("🌙 Після 22:00 - Очікування до 8:00 наступного дня");
+        System.out.println("🔄 Програма працюватиме безперервно кожен день!");
         System.out.println("Scheduler статус: " + (scheduler.isShutdown() ? "ЗУПИНЕНО" : "ПРАЦЮЄ"));
     }
     
@@ -80,6 +81,8 @@ public class AutoPostingScheduler {
             try {
                 // 1. Одразу парсимо
                 System.out.println("Одразу парсимо оголошення...");
+                // Очищуємо кеш перевірених квартир перед парсингом
+                parserService.clearCache();
                 parserService.parseApartmentsForAllCities();
 
                 while (true) {
@@ -88,25 +91,24 @@ public class AutoPostingScheduler {
                     
                     // Якщо після 22:00, чекаємо до 8:00 наступного дня
                     if (currentHour >= 22) {
-                        System.out.println("Робочий день завершено (після 22:00). Чекаємо до 8:00 наступного дня...");
+                        System.out.println("🌙 Робочий день завершено (після 22:00). Очікування до 8:00 наступного дня...");
                         long delayTo8AM = calculateDelayToTime(8, 0);
                         java.time.LocalDateTime nextRun = java.time.LocalDateTime.now().plusSeconds(delayTo8AM);
-                        System.out.println("Наступний ранковий парсинг заплановано на: " + nextRun.format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm:ss")));
+                        System.out.println("⏰ Наступний ранковий парсинг заплановано на: " + nextRun.format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm:ss")));
                         Thread.sleep(delayTo8AM * 1000);
                         
                         // Ранковий парсинг о 8:00
-                        System.out.println("=== РАНКОВИЙ ПАРСИНГ ===");
+                        System.out.println("🌅 === РАНКОВИЙ ПАРСИНГ (8:00) ===");
                         System.out.println("Поточний час: " + java.time.LocalTime.now());
                         System.out.println("Дата: " + java.time.LocalDate.now());
-                        System.out.println("Починаємо ранковий парсинг (8:00) для всіх міст...");
-                        System.out.println("Очищення таблиць і фото...");
+                        System.out.println("🧹 Очищення таблиць і фото...");
                         parserService.parseApartmentsForAllCitiesMorning();
-                        System.out.println("Ранковий парсинг завершено!");
+                        System.out.println("✅ Ранковий парсинг завершено!");
                         
                         // Чекаємо до 10:00 для початку постингу
                         long delayTo10AM = calculateDelayToTime(10, 0);
                         java.time.LocalDateTime nextPostingTime = java.time.LocalDateTime.now().plusSeconds(delayTo10AM);
-                        System.out.println("Щогодинний постинг заплановано на: " + nextPostingTime.format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm:ss")));
+                        System.out.println("⏰ Щогодинний постинг заплановано на: " + nextPostingTime.format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm:ss")));
                         Thread.sleep(delayTo10AM * 1000);
                         continue;
                     }
@@ -115,59 +117,66 @@ public class AutoPostingScheduler {
                     java.time.LocalTime nextHour = now.truncatedTo(java.time.temporal.ChronoUnit.HOURS).plusHours(1);
                     long secondsToNextHour = java.time.Duration.between(now, nextHour).getSeconds();
                     if (verbose) {
-                        System.out.println("Чекаємо до наступної години: " + nextHour + " (" + formatDelay(secondsToNextHour) + ")");
+                        System.out.println("⏳ Чекаємо до наступної години: " + nextHour + " (" + formatDelay(secondsToNextHour) + ")");
                     }
                     Thread.sleep(secondsToNextHour * 1000);
 
-                    // 3. Постимо
+                    // 3. Постимо (тільки в робочі години 10:00-22:00)
                     java.time.LocalTime postTime = java.time.LocalTime.now();
                     if (postTime.getHour() < 10 || postTime.getHour() > 22) {
                         if (verbose) {
-                            System.out.println("Постинг пропущено (поза робочими годинами 10:00-22:00)");
+                            System.out.println("⏭️ Постинг пропущено (поза робочими годинами 10:00-22:00)");
                         }
                         continue;
                     }
+                    
+                    System.out.println("📤 === ЩОГОДИННИЙ ПОСТИНГ (" + postTime.getHour() + ":00) ===");
                     System.out.println("Починаємо постинг (" + postTime.getHour() + ":00) для всіх міст...");
                     postingService.publishPostsForAllCitiesWithSmartLogic(2);
-                    System.out.println("Постинг завершено!");
+                    System.out.println("✅ Постинг завершено!");
 
-                    // 4. Одразу парсимо для наступної години
-                    System.out.println("Парсинг нових оголошень після постингу (" + postTime.getHour() + ":00) для всіх міст...");
+                    // 4. Допарсинг нових оголошень після постингу
+                    System.out.println("🔍 === ДОПАРСИНГ НОВИХ ОГОЛОШЕНЬ (" + postTime.getHour() + ":00) ===");
+                    // Очищуємо кеш перевірених квартир перед парсингом
+                    parserService.clearCache();
                     parserService.parseApartmentsForAllCities();
-                    System.out.println("Парсинг завершено!");
+                    System.out.println("✅ Допарсинг завершено!");
                     
                     // Виводимо статистику після парсингу
                     databaseManager.printStatisticsForAllCities();
                     
-                    // 5. Чекаємо 1 годину (до наступної повної години)
-                    // (наступна ітерація циклу)
+                    System.out.println("🔄 === ЩОГОДИННИЙ ЦИКЛ (" + postTime.getHour() + ":00) ЗАВЕРШЕНО ===");
+                    
+                    // 5. Чекаємо до наступної години (наступна ітерація циклу)
+                    // (наступна ітерація циклу автоматично чекає до наступної години)
                 }
             } catch (InterruptedException e) {
-                System.out.println("Автоматичний режим з поточного моменту зупинено!");
+                System.out.println("🛑 Автоматичний режим з поточного моменту зупинено!");
                 Thread.currentThread().interrupt();
             } catch (Exception e) {
-                System.err.println("Помилка в автоматичному режимі: " + e.getMessage());
+                System.err.println("❌ Помилка в автоматичному режимі: " + e.getMessage());
             }
         });
         autonowThread.setDaemon(true);
         autonowThread.start();
-        System.out.println("Автоматичний постинг з поточного моменту запущено!");
-        System.out.println("Розклад: постинг щогодини з 10:00 до 22:00, потім очікування до 8:00 наступного дня для ранкового парсингу.");
-        System.out.println("Програма працюватиме безперервно кожен день!");
+        System.out.println("🚀 Автоматичний постинг з поточного моменту запущено!");
+        System.out.println("📅 Розклад: 8:00 - Очистка БД + Парсинг; 10:00-22:00 - Щогодинний постинг + Допарсинг");
+        System.out.println("🌙 Після 22:00 - Очікування до 8:00 наступного дня");
+        System.out.println("🔄 Програма працюватиме безперервно кожен день!");
     }
     
     private void runHourlyPosting() {
         java.time.LocalTime currentTime = java.time.LocalTime.now();
-        System.out.println("\n=== ЩОГОДИННИЙ ПОСТИНГ ===");
+        System.out.println("\n🕙 === ЩОГОДИННИЙ ПОСТИНГ ===");
         System.out.println("Поточний час: " + currentTime);
         System.out.println("Дата: " + java.time.LocalDate.now());
         
         if (currentTime.getHour() < 10 || currentTime.getHour() > 22) {
-            System.out.println("Щогодинний постинг пропущено (поза робочими часами 10:00-22:00)");
+            System.out.println("⏭️ Щогодинний постинг пропущено (поза робочими часами 10:00-22:00)");
             
             // Якщо після 22:00, плануємо наступний запуск на завтра о 8:00 (ранковий парсинг)
             if (currentTime.getHour() >= 22) {
-                System.out.println("Робочий день завершено. Плануємо ранковий парсинг на завтра о 8:00");
+                System.out.println("🌙 Робочий день завершено. Плануємо ранковий парсинг на завтра о 8:00");
                 long nextDelay = calculateDelayToTime(8, 0);
                 scheduleNextMorningParsing(nextDelay);
             } else {
@@ -179,24 +188,26 @@ public class AutoPostingScheduler {
         }
         
         try {
-            System.out.println("Починаємо щогодинний постинг (" + currentTime.getHour() + ":00) для всіх міст...");
+            System.out.println("📤 Починаємо щогодинний постинг (" + currentTime.getHour() + ":00) для всіх міст...");
             postingService.publishPostsForAllCitiesWithSmartLogic(2);
-            System.out.println("Щогодинний постинг завершено!");
+            System.out.println("✅ Щогодинний постинг завершено!");
             
-            System.out.println("Парсинг нових оголошень після постингу (" + currentTime.getHour() + ":00) для всіх міст...");
+            System.out.println("🔍 Парсинг нових оголошень після постингу (" + currentTime.getHour() + ":00) для всіх міст...");
+            // Очищуємо кеш перевірених квартир перед парсингом
+            parserService.clearCache();
             parserService.parseApartmentsForAllCities();
-            System.out.println("Парсинг завершено!");
+            System.out.println("✅ Парсинг завершено!");
             
             // Виводимо статистику після парсингу
             databaseManager.printStatisticsForAllCities();
             
-            System.out.println("=== ЩОГОДИННИЙ ЦИКЛ ЗАВЕРШЕНО ===");
+            System.out.println("🔄 === ЩОГОДИННИЙ ЦИКЛ ЗАВЕРШЕНО ===");
             
             // Плануємо наступний запуск через годину
             long nextDelay = calculateDelayToNextHour();
             scheduleNextHourlyPosting(nextDelay);
         } catch (Exception e) {
-            System.err.println("ПОМИЛКА щогодинного постингу: " + e.getMessage());
+            System.err.println("❌ ПОМИЛКА щогодинного постингу: " + e.getMessage());
             e.printStackTrace();
             // Навіть при помилці плануємо наступний запуск
             long nextDelay = calculateDelayToNextHour();
@@ -205,33 +216,33 @@ public class AutoPostingScheduler {
     }
     
     private void runMorningParsing() {
-        System.out.println("\n=== РАНКОВИЙ ПАРСИНГ ===");
+        System.out.println("\n🌅 === РАНКОВИЙ ПАРСИНГ (8:00) ===");
         System.out.println("Поточний час: " + LocalTime.now());
         System.out.println("Дата: " + java.time.LocalDate.now());
         
         try {
-            System.out.println("Починаємо ранковий парсинг (8:00) для всіх міст...");
-            System.out.println("Очищення таблиць і фото...");
+            System.out.println("🧹 Починаємо ранковий парсинг (8:00) для всіх міст...");
+            System.out.println("🧹 Очищення таблиць і фото...");
             parserService.parseApartmentsForAllCitiesMorning();
-            System.out.println("Ранковий парсинг завершено!");
+            System.out.println("✅ Ранковий парсинг завершено!");
             
             // Виводимо статистику після ранкового парсингу
             databaseManager.printStatisticsForAllCities();
-            System.out.println("=== РАНКОВИЙ ПАРСИНГ ЗАВЕРШЕНО ===");
+            System.out.println("🌅 === РАНКОВИЙ ПАРСИНГ ЗАВЕРШЕНО ===");
             
             // Плануємо щогодинний постинг о 10:00
             long delayTo10AM = calculateDelayToTime(10, 0);
             java.time.LocalDateTime nextPostingTime = java.time.LocalDateTime.now().plusSeconds(delayTo10AM);
-            System.out.println("Щогодинний постинг заплановано на: " + nextPostingTime.format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm:ss")));
+            System.out.println("⏰ Щогодинний постинг заплановано на: " + nextPostingTime.format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm:ss")));
             scheduleNextHourlyPosting(delayTo10AM);
             
             // Плануємо наступний ранковий парсинг на завтра о 8:00
             long nextDelay = calculateDelayToTime(8, 0);
             java.time.LocalDateTime nextRun = java.time.LocalDateTime.now().plusSeconds(nextDelay);
-            System.out.println("Наступний ранковий парсинг заплановано на: " + nextRun.format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm:ss")));
+            System.out.println("⏰ Наступний ранковий парсинг заплановано на: " + nextRun.format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm:ss")));
             scheduleNextMorningParsing(nextDelay);
         } catch (Exception e) {
-            System.err.println("ПОМИЛКА ранкового парсингу: " + e.getMessage());
+            System.err.println("❌ ПОМИЛКА ранкового парсингу: " + e.getMessage());
             e.printStackTrace();
             // Навіть при помилці плануємо наступний запуск на завтра о 8:00
             long nextDelay = calculateDelayToTime(8, 0);
@@ -288,7 +299,7 @@ public class AutoPostingScheduler {
     }
     
     public void stop() {
-        System.out.println("Зупинка автоматичного постингу...");
+        System.out.println("🛑 Зупинка автоматичного постингу...");
         scheduler.shutdown();
         
         try {
@@ -300,25 +311,25 @@ public class AutoPostingScheduler {
             Thread.currentThread().interrupt();
         }
         
-        System.out.println("Автоматичний постинг зупинено!");
+        System.out.println("✅ Автоматичний постинг зупинено!");
     }
 
     // Тестовий режим для швидкої перевірки логіки автоматичного постингу
     public void startTestScheduledPosting() {
-        System.out.println("Тестовий запуск автоматичного постингу (швидкий цикл)...");
+        System.out.println("🧪 Тестовий запуск автоматичного постингу (швидкий цикл)...");
         // 1. Очищення і парсинг як о 8:00
         parserService.parseApartmentsForAllCitiesMorning();
         // 2. Далі цикл: постинг -> парсинг -> чекати 10 секунд
         new Thread(() -> {
             try {
                 for (int i = 0; i < 3; i++) { // 3 ітерації для тесту
-                    System.out.println("Тестовий постинг (імітація 10:00+)");
+                    System.out.println("🧪 Тестовий постинг (імітація 10:00+)");
                     postingService.publishPostsForAllCitiesWithSmartLogic(2);
-                    System.out.println("Тестовий парсинг після постингу");
+                    System.out.println("🧪 Тестовий парсинг після постингу");
                     parserService.parseApartmentsForAllCities();
                     Thread.sleep(10000); // 10 секунд між ітераціями
                 }
-                System.out.println("Тест завершено!");
+                System.out.println("✅ Тест завершено!");
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
