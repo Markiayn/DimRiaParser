@@ -62,7 +62,7 @@ public class RiaParserService {
             parseApartments(
                 city.dbTable,
                 city.cityId,
-                null,
+                city.cityId, // Передаємо cityId замість null
                 2,
                 3,
                 city.hours,
@@ -90,7 +90,7 @@ public class RiaParserService {
             parseApartments(
                 city.dbTable,
                 city.cityId,
-                null,
+                city.cityId, // Передаємо cityId замість null
                 2,
                 3,
                 city.hours,
@@ -235,12 +235,9 @@ public class RiaParserService {
                 .append("&realty_type=").append(realtyType)
                 .append("&operation=").append(operationType)
                 .append("&state_id=").append(regionId)
+                .append("&city_id=").append(regionId) // Дублюємо state_id в city_id
                 .append("&price_cur=1&wo_dupl=1&sort=created_at")
                 .append("&firstIteraction=false&limit=20&type=list&client=searchV2");
-        
-        if (cityId != null) {
-            url.append("&city_id=").append(cityId);
-        }
         
         url.append("&page=").append(page);
         return url.toString();
