@@ -733,6 +733,9 @@ public class RiaParserService {
         ChromeOptions options = new ChromeOptions();
         options.addArguments("--disable-blink-features=AutomationControlled");
         options.addArguments("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/115.0.0.0 Safari/537.36");
+        options.addArguments("--window-size=1920,1080");
+        options.addArguments("--disable-notifications");
+
         // options.addArguments("--headless=new"); // Вимкнено headless режим для візуалізації браузера
         
         // Оптимізація для швидкості
@@ -743,6 +746,7 @@ public class RiaParserService {
         options.addArguments("--disable-dev-shm-usage");
         options.addArguments("--disable-web-security");
         options.addArguments("--disable-features=VizDisplayCompositor");
+
         
         ChromeDriver driver = new ChromeDriver(options);
         driver.manage().timeouts().implicitlyWait(Duration.ofSeconds(5)); // Оптимізовано для швидкості

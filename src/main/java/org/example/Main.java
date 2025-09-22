@@ -14,7 +14,8 @@ public class Main {
     public static void main(String[] args) {
         System.out.println("🏠 DimRiaParser - Парсер оголошень з dom.ria.com");
         System.out.println("=".repeat(60));
-        
+
+
         if (!validateConfiguration()) {
             System.exit(1);
         }

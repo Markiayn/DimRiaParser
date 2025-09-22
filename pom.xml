@@ -10,59 +10,91 @@
     <artifactId>dom-ria-parser</artifactId>
     <version>1.0-SNAPSHOT</version>
 
+    <!-- ✅ ВАЖЛИВО: тут фіксуємо цільову версію Java для компілятора -->
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <maven.compiler.release>21</maven.compiler.release>
+        <selenium.version>4.34.0</selenium.version>
+        <jsoup.version>1.17.2</jsoup.version>
+        <json.version>20230227</json.version>
+        <mongodb.version>4.3.4</mongodb.version>
+        <sqlite.version>3.49.1.0</sqlite.version>
+        <jdbi.version>3.43.0</jdbi.version>
+        <telegrambots.version>6.9.7.1</telegrambots.version>
+        <slf4j.version>1.7.36</slf4j.version>
+    </properties>
+
     <dependencies>
         <dependency>
             <groupId>org.jsoup</groupId>
             <artifactId>jsoup</artifactId>
-            <version>1.17.2</version>
+            <version>${jsoup.version}</version>
         </dependency>
 
         <dependency>
             <groupId>org.json</groupId>
             <artifactId>json</artifactId>
-            <version>20230227</version>
+            <version>${json.version}</version>
         </dependency>
+
         <dependency>
             <groupId>org.seleniumhq.selenium</groupId>
             <artifactId>selenium-java</artifactId>
-            <version>4.34.0</version>
+            <version>${selenium.version}</version>
         </dependency>
+
+        <!-- 🔧 Вирівняв версію devtools під selenium.version -->
+        <!-- Підбери vXXX під версію Chrome у системі (наприклад, v130, v131, v136 і т.д.) -->
         <dependency>
             <groupId>org.seleniumhq.selenium</groupId>
             <artifactId>selenium-devtools-v136</artifactId>
-            <version>4.33.0</version>
+            <version>${selenium.version}</version>
         </dependency>
 
         <dependency>
             <groupId>org.mongodb</groupId>
             <artifactId>mongodb-driver-sync</artifactId>
-            <version>4.3.4</version>
+            <version>${mongodb.version}</version>
         </dependency>
+
         <dependency>
             <groupId>org.xerial</groupId>
             <artifactId>sqlite-jdbc</artifactId>
-            <version>3.49.1.0</version>
+            <version>${sqlite.version}</version>
         </dependency>
+
         <dependency>
             <groupId>org.jdbi</groupId>
             <artifactId>jdbi3-core</artifactId>
-            <version>3.43.0</version>
+            <version>${jdbi.version}</version>
         </dependency>
+
         <dependency>
             <groupId>org.telegram</groupId>
             <artifactId>telegrambots</artifactId>
-            <version>6.9.7.1</version>
+            <version>${telegrambots.version}</version>
         </dependency>
+
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-simple</artifactId>
-            <version>1.7.36</version>
+            <version>${slf4j.version}</version>
         </dependency>
-
     </dependencies>
 
     <build>
         <plugins>
+            <!-- ✅ Головне: компіляція під Java 21 (або вище), щоб працював String.repeat(...) -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.13.0</version>
+                <configuration>
+                    <!-- Використовує системний JDK, але ставить таргетний рівень байткоду -->
+                    <release>${maven.compiler.release}</release>
+                </configuration>
+            </plugin>
+
             <plugin>
                 <artifactId>maven-assembly-plugin</artifactId>
                 <configuration>
@@ -85,7 +117,7 @@
                     </execution>
                 </executions>
             </plugin>
-            
+
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-resources-plugin</artifactId>
@@ -112,4 +144,4 @@
         </plugins>
     </build>
 
-</project> 
+</project>
