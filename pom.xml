@@ -14,7 +14,7 @@
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.release>21</maven.compiler.release>
-        <selenium.version>4.34.0</selenium.version>
+        <selenium.version>4.39.0</selenium.version>
         <jsoup.version>1.17.2</jsoup.version>
         <json.version>20230227</json.version>
         <mongodb.version>4.3.4</mongodb.version>
@@ -43,13 +43,13 @@
             <version>${selenium.version}</version>
         </dependency>
 
-        <!-- 🔧 Вирівняв версію devtools під selenium.version -->
-        <!-- Підбери vXXX під версію Chrome у системі (наприклад, v130, v131, v136 і т.д.) -->
+        <!-- https://mvnrepository.com/artifact/org.seleniumhq.selenium/selenium-devtools-v143 -->
         <dependency>
             <groupId>org.seleniumhq.selenium</groupId>
-            <artifactId>selenium-devtools-v136</artifactId>
+            <artifactId>selenium-devtools-v143</artifactId>
             <version>${selenium.version}</version>
         </dependency>
+
 
         <dependency>
             <groupId>org.mongodb</groupId>
